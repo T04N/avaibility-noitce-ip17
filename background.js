@@ -36,40 +36,81 @@ class DiscordNotifier {
   }
 
   async handleMessage(message, sender, sendResponse) {
-    switch (message.type) {
-      case 'AVAILABILITY_CHANGE':
-        await this.handleAvailabilityChange(message.data);
-        break;
-      case 'COLOR_SELECTED':
-        await this.handleColorSelection(message);
-        break;
-      case 'CAPACITY_SELECTED':
-        await this.handleCapacitySelection(message);
-        break;
-      case 'PAYMENT_SELECTED':
-        await this.handlePaymentSelection(message);
-        break;
-      case 'APPLECARE_SELECTED':
-        await this.handleAppleCareSelection(message);
-        break;
-      case 'STORE_AVAILABILITY_CHECK':
-        await this.handleStoreAvailabilityCheck(message);
-        break;
-      case 'STORE_AVAILABILITY_RESULTS':
-        await this.handleStoreAvailabilityResults(message);
-        break;
-      case 'GET_SETTINGS':
-        sendResponse({
-          webhookUrl: this.webhookUrl,
-          isEnabled: this.isEnabled
-        });
-        break;
-      case 'UPDATE_SETTINGS':
-        await this.updateSettings(message.settings);
-        sendResponse({ success: true });
-        break;
-      default:
-        console.log('Unknown message type:', message.type);
+    try {
+      console.log('Handling message:', message);
+      
+      // Validate message structure
+      if (!message || typeof message !== 'object') {
+        console.error('Invalid message received:', message);
+        sendResponse({ success: false, error: 'Invalid message structure' });
+        return;
+      }
+      
+      if (!message.type || typeof message.type !== 'string') {
+        console.error('Message missing type:', message);
+        sendResponse({ success: false, error: 'Message missing type' });
+        return;
+      }
+      
+      // Route message to appropriate handler
+      switch (message.type) {
+        case 'AVAILABILITY_CHANGE':
+          if (message.data) {
+            await this.handleAvailabilityChange(message.data);
+          } else {
+            console.error('AVAILABILITY_CHANGE message missing data');
+          }
+          break;
+          
+        case 'COLOR_SELECTED':
+          await this.handleColorSelection(message);
+          break;
+          
+        case 'CAPACITY_SELECTED':
+          await this.handleCapacitySelection(message);
+          break;
+          
+        case 'PAYMENT_SELECTED':
+          await this.handlePaymentSelection(message);
+          break;
+          
+        case 'APPLECARE_SELECTED':
+          await this.handleAppleCareSelection(message);
+          break;
+          
+        case 'STORE_AVAILABILITY_CHECK':
+          await this.handleStoreAvailabilityCheck(message);
+          break;
+          
+        case 'STORE_AVAILABILITY_RESULTS':
+          await this.handleStoreAvailabilityResults(message);
+          break;
+          
+        case 'GET_SETTINGS':
+          sendResponse({
+            webhookUrl: this.webhookUrl,
+            isEnabled: this.isEnabled
+          });
+          break;
+          
+        case 'UPDATE_SETTINGS':
+          if (message.settings) {
+            await this.updateSettings(message.settings);
+            sendResponse({ success: true });
+          } else {
+            console.error('UPDATE_SETTINGS message missing settings');
+            sendResponse({ success: false, error: 'Missing settings data' });
+          }
+          break;
+          
+        default:
+          console.warn('Unknown message type:', message.type);
+      }
+      
+      sendResponse({ success: true });
+    } catch (error) {
+      console.error('Error handling message:', error, message);
+      sendResponse({ success: false, error: error.message });
     }
   }
 
@@ -95,6 +136,12 @@ class DiscordNotifier {
       return;
     }
 
+    // Validate availabilityData
+    if (!availabilityData || typeof availabilityData !== 'object') {
+      console.error('Invalid availability data:', availabilityData);
+      return;
+    }
+
     // Check cooldown to avoid spam (2 seconds)
     const now = Date.now();
     if (this.lastNotificationTime && (now - this.lastNotificationTime) < this.notificationCooldown) {
@@ -111,46 +158,62 @@ class DiscordNotifier {
   }
 
   async sendDiscordNotification(availabilityData) {
-    const embed = this.createDiscordEmbed(availabilityData);
-    
-    const payload = {
-      content: '🍎 **iPhone 17 Pro Availability Alert**',
-      embeds: [embed]
-    };
+    try {
+      const embed = this.createDiscordEmbed(availabilityData);
+      
+      if (!embed) {
+        console.error('Failed to create Discord embed');
+        return;
+      }
+      
+      const payload = {
+        content: '🍎 **iPhone 17 Pro Availability Alert**',
+        embeds: [embed]
+      };
 
-    const response = await fetch(this.webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload)
-    });
+      const response = await fetch(this.webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
 
-    if (!response.ok) {
-      throw new Error(`Discord webhook failed: ${response.status} ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`Discord webhook failed: ${response.status} ${response.statusText}`);
+      }
+
+      console.log('Discord notification sent successfully');
+    } catch (error) {
+      console.error('Error in sendDiscordNotification:', error);
+      throw error;
     }
-
-    console.log('Discord notification sent successfully');
   }
 
   createDiscordEmbed(availabilityData) {
     const availableItems = [];
     const unavailableItems = [];
 
-    // Analyze availability data
-    for (const [key, item] of Object.entries(availabilityData.availability)) {
-      if (item.isAvailable) {
-        availableItems.push(`✅ ${item.text || key}`);
-      } else {
-        unavailableItems.push(`❌ ${item.text || key}`);
+    // Safely analyze availability data
+    if (availabilityData && availabilityData.availability && typeof availabilityData.availability === 'object') {
+      try {
+        for (const [key, item] of Object.entries(availabilityData.availability)) {
+          if (item && typeof item === 'object' && item.isAvailable) {
+            availableItems.push(`✅ ${item.text || key}`);
+          } else if (item && typeof item === 'object') {
+            unavailableItems.push(`❌ ${item.text || key}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error processing availability data:', error);
       }
     }
 
     const embed = {
       title: 'iPhone 17 Pro Availability Update',
-      url: availabilityData.url,
+      url: (availabilityData && availabilityData.url) ? availabilityData.url : '',
       color: availableItems.length > 0 ? 0x00ff00 : 0xff0000, // Green if available, red if not
-      timestamp: availabilityData.timestamp,
+      timestamp: (availabilityData && availabilityData.timestamp) ? availabilityData.timestamp : new Date().toISOString(),
       fields: [
         {
           name: '📱 Available Items',
@@ -173,16 +236,25 @@ class DiscordNotifier {
     }
 
     // Add buy buttons status
-    if (availabilityData.availability.buyButtons) {
-      const buyButtonStatus = availabilityData.availability.buyButtons
-        .map(btn => `${btn.isAvailable ? '✅' : '❌'} ${btn.text}`)
-        .join('\n');
-      
-      embed.fields.push({
-        name: '🛒 Buy Buttons',
-        value: buyButtonStatus || 'No buy buttons found',
-        inline: false
-      });
+    if (availabilityData && availabilityData.availability && availabilityData.availability.buyButtons && Array.isArray(availabilityData.availability.buyButtons)) {
+      try {
+        const buyButtonStatus = availabilityData.availability.buyButtons
+          .map(btn => {
+            if (btn && typeof btn === 'object') {
+              return `${btn.isAvailable ? '✅' : '❌'} ${btn.text || 'Unknown button'}`;
+            }
+            return '❌ Invalid button data';
+          })
+          .join('\n');
+        
+        embed.fields.push({
+          name: '🛒 Buy Buttons',
+          value: buyButtonStatus || 'No buy buttons found',
+          inline: false
+        });
+      } catch (error) {
+        console.error('Error processing buy buttons:', error);
+      }
     }
 
     return embed;
@@ -224,13 +296,22 @@ class DiscordNotifier {
 
   async handleColorSelection(message) {
     try {
+      // Validate message
+      if (!message || typeof message !== 'object') {
+        console.error('Invalid color selection message:', message);
+        return;
+      }
+      
+      const color = (message.color && typeof message.color === 'string') ? message.color : 'Unknown';
+      const timestamp = (message.timestamp && typeof message.timestamp === 'string') ? message.timestamp : new Date().toISOString();
+      
       const payload = {
-        content: `🎨 **Color Selected: ${message.color}**`,
+        content: `🎨 **Color Selected: ${color}**`,
         embeds: [{
           title: 'iPhone Color Selection',
-          description: `Automatically selected color: **${message.color}**`,
+          description: `Automatically selected color: **${color}**`,
           color: 0xffa500,
-          timestamp: message.timestamp,
+          timestamp: timestamp,
           footer: {
             text: 'Auto-selection completed',
             icon_url: 'https://www.apple.com/favicon.ico'
@@ -447,19 +528,35 @@ class DiscordNotifier {
 
         // Add available stores
         if (availableStores.length > 0) {
-          embed.fields.push({
-            name: '✅ Available Stores',
-            value: availableStores.map(store => {
-              if (!store || typeof store !== 'object') return '• **Invalid Store Data**';
-              
-              const name = (store.name && typeof store.name === 'string') ? store.name.trim() : 'Unknown Store';
-              const location = (store.location && typeof store.location === 'string') ? store.location.trim() : 'Unknown Location';
-              const status = (store.status && typeof store.status === 'string') ? store.status.trim() : 'Available';
-              
-              return `• **${name}**\n  📍 ${location}\n  📱 ${status}`;
-            }).join('\n\n'),
-            inline: false
-          });
+          try {
+            const storeTexts = availableStores.map(store => {
+              try {
+                if (!store || typeof store !== 'object') return '• **Invalid Store Data**';
+                
+                const name = (store.name && typeof store.name === 'string') ? store.name.trim() : 'Unknown Store';
+                const location = (store.location && typeof store.location === 'string') ? store.location.trim() : 'Unknown Location';
+                const status = (store.status && typeof store.status === 'string') ? store.status.trim() : 'Available';
+                
+                return `• **${name}**\n  📍 ${location}\n  📱 ${status}`;
+              } catch (error) {
+                console.error('Error processing store:', error, store);
+                return '• **Error processing store data**';
+              }
+            });
+            
+            embed.fields.push({
+              name: '✅ Available Stores',
+              value: storeTexts.join('\n\n'),
+              inline: false
+            });
+          } catch (error) {
+            console.error('Error processing available stores:', error);
+            embed.fields.push({
+              name: '✅ Available Stores',
+              value: 'Error processing available stores data',
+              inline: false
+            });
+          }
         } else {
           embed.fields.push({
             name: '❌ No Available Stores',
@@ -470,36 +567,68 @@ class DiscordNotifier {
 
         // Add unavailable stores
         if (unavailableStores.length > 0) {
-          embed.fields.push({
-            name: '🚫 Unavailable Stores',
-            value: unavailableStores.slice(0, 6).map(store => {
-              if (!store || typeof store !== 'object') return '• **Invalid Store Data**';
-              
-              const name = (store.name && typeof store.name === 'string') ? store.name.trim() : 'Unknown Store';
-              const status = (store.status && typeof store.status === 'string') ? store.status.trim() : 'Not available';
-              
-              return `• **${name}** - ${status}`;
-            }).join('\n'),
-            inline: false
-          });
+          try {
+            const storeTexts = unavailableStores.slice(0, 6).map(store => {
+              try {
+                if (!store || typeof store !== 'object') return '• **Invalid Store Data**';
+                
+                const name = (store.name && typeof store.name === 'string') ? store.name.trim() : 'Unknown Store';
+                const status = (store.status && typeof store.status === 'string') ? store.status.trim() : 'Not available';
+                
+                return `• **${name}** - ${status}`;
+              } catch (error) {
+                console.error('Error processing unavailable store:', error, store);
+                return '• **Error processing store data**';
+              }
+            });
+            
+            embed.fields.push({
+              name: '🚫 Unavailable Stores',
+              value: storeTexts.join('\n'),
+              inline: false
+            });
+          } catch (error) {
+            console.error('Error processing unavailable stores:', error);
+            embed.fields.push({
+              name: '🚫 Unavailable Stores',
+              value: 'Error processing unavailable stores data',
+              inline: false
+            });
+          }
         }
 
         // Add delivery options if available
         if (data.deliveryOptions && Array.isArray(data.deliveryOptions) && data.deliveryOptions.length > 0) {
-          embed.fields.push({
-            name: '🚚 Delivery Options',
-            value: data.deliveryOptions.map(option => {
-              if (typeof option === 'string' && option.trim()) {
-                return `• ${option.trim()}`;
+          try {
+            const deliveryTexts = data.deliveryOptions.map(option => {
+              try {
+                if (typeof option === 'string' && option.trim()) {
+                  return `• ${option.trim()}`;
+                }
+                return '• Unknown option';
+              } catch (error) {
+                console.error('Error processing delivery option:', error, option);
+                return '• **Error processing option**';
               }
-              return '• Unknown option';
-            }).join('\n'),
-            inline: false
-          });
+            });
+            
+            embed.fields.push({
+              name: '🚚 Delivery Options',
+              value: deliveryTexts.join('\n'),
+              inline: false
+            });
+          } catch (error) {
+            console.error('Error processing delivery options:', error);
+            embed.fields.push({
+              name: '🚚 Delivery Options',
+              value: 'Error processing delivery options data',
+              inline: false
+            });
+          }
         }
 
         embed.footer = {
-          text: `Checked ${stores.length} stores • ${data.hasAvailability ? 'Some availability found' : 'No availability'}`,
+          text: `Checked ${stores.length} stores • ${(data.hasAvailability === true) ? 'Some availability found' : 'No availability'}`,
           icon_url: 'https://www.apple.com/favicon.ico'
         };
 

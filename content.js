@@ -472,6 +472,13 @@ class iPhoneAvailabilityMonitor {
 
     setTimeout(() => {
       console.log(`Analyzing store data (attempt ${attempt + 1}/${maxAttempts})...`);
+      
+      // Try to find the no pickup stores button first
+      const noPickupButton = this.findNoPickupButton();
+      if (noPickupButton) {
+        console.log('Found no pickup button, proceeding with analysis...');
+      }
+      
       const hasStoreData = this.analyzeStoreData();
       
       if (!hasStoreData && attempt < maxAttempts - 1) {
@@ -479,6 +486,71 @@ class iPhoneAvailabilityMonitor {
         this.retryStoreDataAnalysis(attempt + 1);
       }
     }, delay);
+  }
+
+  findNoPickupButton() {
+    try {
+      // Try multiple approaches to find the button
+      const approaches = [
+        // Approach 1: Direct selectors
+        () => {
+          const selectors = [
+            '.rf-productlocator-nopickupstores-btn',
+            'button.rf-productlocator-nopickupstores-btn',
+            'button.as-buttonlink.typography-body-reduced',
+            'button[aria-expanded="false"]'
+          ];
+          
+          for (const selector of selectors) {
+            const button = document.querySelector(selector);
+            if (button) {
+              console.log('Found button with direct selector:', selector);
+              return button;
+            }
+          }
+          return null;
+        },
+        
+        // Approach 2: Search by text content
+        () => {
+          const allButtons = document.querySelectorAll('button');
+          for (const button of allButtons) {
+            const text = button.textContent?.trim();
+            if (text && text.includes('お近くの') && text.includes('店舗のストアには')) {
+              console.log('Found button by text content');
+              return button;
+            }
+          }
+          return null;
+        },
+        
+        // Approach 3: Search within no pickup stores container
+        () => {
+          const container = document.querySelector('.rf-productlocator-nopickupstores');
+          if (container) {
+            const button = container.querySelector('button');
+            if (button) {
+              console.log('Found button within no pickup stores container');
+              return button;
+            }
+          }
+          return null;
+        }
+      ];
+      
+      for (const approach of approaches) {
+        const button = approach();
+        if (button) {
+          return button;
+        }
+      }
+      
+      console.log('No pickup button not found with any approach');
+      return null;
+    } catch (error) {
+      console.error('Error finding no pickup button:', error);
+      return null;
+    }
   }
 
   analyzeStoreData() {
@@ -503,15 +575,41 @@ class iPhoneAvailabilityMonitor {
           analysisAttempt: 'success'
         };
 
-        // Check for "no pickup stores" message
+        // Check for "no pickup stores" message with multiple attempts
         if (noPickupStores) {
-          const noPickupButton = noPickupStores.querySelector('.rf-productlocator-nopickupstores-btn');
+          console.log('Found noPickupStores element, looking for button...');
+          
+          // Use the dedicated function to find the button
+          const noPickupButton = this.findNoPickupButton();
+          
           if (noPickupButton) {
-            const summaryText = noPickupButton.querySelector('.rf-productlocator-buttontitle')?.textContent?.trim();
+            // Try multiple selectors for the title text
+            const titleSelectors = [
+              '.rf-productlocator-buttontitle',
+              'span.rf-productlocator-buttontitle',
+              'span[class*="buttontitle"]'
+            ];
+            
+            let summaryText = null;
+            for (const selector of titleSelectors) {
+              const titleElement = noPickupButton.querySelector(selector);
+              if (titleElement) {
+                summaryText = titleElement.textContent?.trim();
+                if (summaryText) {
+                  console.log('Found summary text with selector:', selector);
+                  break;
+                }
+              }
+            }
+            
             if (summaryText) {
               availabilityData.summary = summaryText;
               console.log('No pickup stores message found:', summaryText);
+            } else {
+              console.log('Button found but no title text found');
             }
+          } else {
+            console.log('No pickup button not found with any approach');
           }
         }
 
@@ -560,8 +658,7 @@ class iPhoneAvailabilityMonitor {
         const regionSelectors = [
           '.rf-productlocator-pickuploctionheader h3',
           '.rf-productlocator-pickuploctionheader',
-          'h3:contains("次の地域のApple Storeで受け取る")',
-          'h3:contains("104-0061")'
+          'h3'
         ];
 
         let regionText = null;
@@ -569,7 +666,7 @@ class iPhoneAvailabilityMonitor {
           const element = document.querySelector(selector);
           if (element) {
             regionText = element.textContent?.trim();
-            if (regionText && regionText.includes('次の地域のApple Storeで受け取る')) {
+            if (regionText && (regionText.includes('次の地域のApple Storeで受け取る') || regionText.includes('104-0061'))) {
               availabilityData.region = regionText;
               console.log('Region found:', regionText);
               break;
