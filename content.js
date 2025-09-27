@@ -10,13 +10,39 @@ class iPhoneAvailabilityMonitor {
   }
 
   init() {
+    console.log('iPhone 17 Pro Availability Monitor initializing...');
+    
+    // Check if extension context is available before starting
+    if (!this.isExtensionContextValid()) {
+      console.error('Extension context not available, retrying in 2 seconds...');
+      setTimeout(() => {
+        this.init();
+      }, 2000);
+      return;
+    }
+    
     console.log('iPhone 17 Pro Availability Monitor initialized');
     this.startMonitoring();
     this.autoSelectOptions();
   }
 
+  isExtensionContextValid() {
+    try {
+      return !!(chrome && chrome.runtime && chrome.runtime.sendMessage);
+    } catch (error) {
+      console.error('Error checking extension context:', error);
+      return false;
+    }
+  }
+
   startMonitoring() {
     if (this.isMonitoring) return;
+    
+    // Check if extension context is still valid
+    if (!this.isExtensionContextValid()) {
+      console.error('Extension context invalid, cannot start monitoring');
+      return;
+    }
     
     this.isMonitoring = true;
     console.log('Starting availability monitoring...');
@@ -26,7 +52,14 @@ class iPhoneAvailabilityMonitor {
     
     // Check every 2 seconds
     this.checkInterval = setInterval(() => {
-      this.checkAvailability();
+      try {
+        this.checkAvailability();
+      } catch (error) {
+        console.error('Error in monitoring interval:', error);
+        if (error.message && error.message.includes('Extension context invalidated')) {
+          this.handleContextInvalidation();
+        }
+      }
     }, 2000);
   }
 
@@ -48,8 +81,10 @@ class iPhoneAvailabilityMonitor {
       const availabilityData = this.extractAvailabilityData();
       
       if (availabilityData && this.hasAvailabilityChanged(availabilityData)) {
-        console.log('Availability changed:', availabilityData);
-        this.notifyBackgroundScript(availabilityData);
+        console.log('Availability changed (legacy format):', availabilityData);
+        // Don't send notification from legacy format to avoid spam
+        // Only store availability results should send notifications
+        console.log('Skipping legacy availability notification to avoid spam');
         this.lastAvailability = availabilityData;
       }
     } catch (error) {
@@ -122,13 +157,26 @@ class iPhoneAvailabilityMonitor {
   autoSelectOptions() {
     console.log('Auto-selecting iPhone options...');
     
+    // Check if extension context is still valid
+    if (!this.isExtensionContextValid()) {
+      console.error('Extension context invalid, cannot auto-select options');
+      return;
+    }
+    
     // Wait for page to load completely
     setTimeout(() => {
-      this.selectColor();
-      this.selectCapacity();
-      this.selectPaymentMethod();
-      this.selectAppleCare();
-      this.retryStoreAvailabilityCheck(0);
+      try {
+        this.selectColor();
+        this.selectCapacity();
+        this.selectPaymentMethod();
+        this.selectAppleCare();
+        this.retryStoreAvailabilityCheck(0);
+      } catch (error) {
+        console.error('Error in autoSelectOptions:', error);
+        if (error.message && error.message.includes('Extension context invalidated')) {
+          this.handleContextInvalidation();
+        }
+      }
     }, 2000);
   }
 
@@ -138,16 +186,49 @@ class iPhoneAvailabilityMonitor {
 
     if (attempt >= maxAttempts) {
       console.log('Max attempts reached for finding store button');
+      
+      // Send notification that store button was not found
+      if (!this.storeNotificationSent) {
+        console.log('Store button not found after max attempts, sending notification');
+        const noButtonData = {
+          timestamp: new Date().toISOString(),
+          dialogType: 'no_button_found',
+          stores: [],
+          summary: 'Store availability button not found after 31 attempts',
+          hasAvailability: false,
+          analysisAttempt: 'no_button'
+        };
+        
+        this.safeNotifyBackgroundScript({
+          type: 'STORE_AVAILABILITY_RESULTS',
+          data: noButtonData
+        });
+        this.lastStoreData = noButtonData;
+        this.storeNotificationSent = true;
+      }
       return;
     }
 
     setTimeout(() => {
-      console.log(`Looking for store button (attempt ${attempt + 1}/${maxAttempts})...`);
-      const found = this.checkStoreAvailability();
-      
-      if (!found && attempt < maxAttempts - 1) {
-        console.log('Store button not found, retrying...');
-        this.retryStoreAvailabilityCheck(attempt + 1);
+      try {
+        // Check if extension context is still valid
+        if (!this.isExtensionContextValid()) {
+          console.error('Extension context invalid during retry, stopping');
+          return;
+        }
+        
+        console.log(`Looking for store button (attempt ${attempt + 1}/${maxAttempts})...`);
+        const found = this.checkStoreAvailability();
+        
+        if (!found && attempt < maxAttempts - 1) {
+          console.log('Store button not found, retrying...');
+          this.retryStoreAvailabilityCheck(attempt + 1);
+        }
+      } catch (error) {
+        console.error('Error in retryStoreAvailabilityCheck:', error);
+        if (error.message && error.message.includes('Extension context invalidated')) {
+          this.handleContextInvalidation();
+        }
       }
     }, delay);
   }
@@ -159,7 +240,7 @@ class iPhoneAvailabilityMonitor {
       if (cosmicOrangeInput && !cosmicOrangeInput.checked) {
         console.log('Selecting Cosmic Orange color...');
         cosmicOrangeInput.click();
-        this.notifyBackgroundScript({
+        this.safeNotifyBackgroundScript({
           type: 'COLOR_SELECTED',
           color: 'cosmicorange',
           timestamp: new Date().toISOString()
@@ -172,7 +253,7 @@ class iPhoneAvailabilityMonitor {
         if (silverInput && !silverInput.checked) {
           console.log('Selecting Silver color as fallback...');
           silverInput.click();
-          this.notifyBackgroundScript({
+          this.safeNotifyBackgroundScript({
             type: 'COLOR_SELECTED',
             color: 'silver',
             timestamp: new Date().toISOString()
@@ -191,7 +272,7 @@ class iPhoneAvailabilityMonitor {
       if (capacity256Input && !capacity256Input.checked) {
         console.log('Selecting 256GB capacity...');
         capacity256Input.click();
-        this.notifyBackgroundScript({
+        this.safeNotifyBackgroundScript({
           type: 'CAPACITY_SELECTED',
           capacity: '256gb',
           timestamp: new Date().toISOString()
@@ -211,7 +292,7 @@ class iPhoneAvailabilityMonitor {
       if (fullPriceInput && !fullPriceInput.checked) {
         console.log('Selecting full price payment method...');
         fullPriceInput.click();
-        this.notifyBackgroundScript({
+        this.safeNotifyBackgroundScript({
           type: 'PAYMENT_SELECTED',
           payment: 'fullprice',
           timestamp: new Date().toISOString()
@@ -231,7 +312,7 @@ class iPhoneAvailabilityMonitor {
       if (noAppleCareInput && !noAppleCareInput.checked) {
         console.log('Selecting No AppleCare+ option...');
         noAppleCareInput.click();
-        this.notifyBackgroundScript({
+        this.safeNotifyBackgroundScript({
           type: 'APPLECARE_SELECTED',
           applecare: 'none',
           timestamp: new Date().toISOString()
@@ -246,53 +327,85 @@ class iPhoneAvailabilityMonitor {
 
   checkStoreAvailability() {
     try {
+      // Check if extension context is still valid
+      if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
+        console.error('Extension context invalidated, cannot check store availability');
+        return false;
+      }
+
       // Look for Apple Ginza store availability button with multiple selectors
       const selectors = [
         'button[data-ase-overlay="buac-overlay"]',
         'button.as-retailavailabilitytrigger-infobutton',
         'button.retail-availability-search-trigger',
-        'button[data-ase-click="show"]',
-        'button:contains("Apple 銀座")',
-        'button:contains("銀座")'
+        'button[data-ase-click="show"]'
       ];
 
       let appleGinzaButton = null;
       for (const selector of selectors) {
-        appleGinzaButton = document.querySelector(selector);
-        if (appleGinzaButton) break;
+        try {
+          appleGinzaButton = document.querySelector(selector);
+          if (appleGinzaButton) break;
+        } catch (selectorError) {
+          console.warn('Error with selector:', selector, selectorError);
+          continue;
+        }
       }
 
       // If not found with selectors, look for any button containing "Apple" or "銀座"
       if (!appleGinzaButton) {
-        const allButtons = document.querySelectorAll('button');
-        appleGinzaButton = Array.from(allButtons).find(btn => {
-          const text = btn.textContent?.toLowerCase() || '';
-          return text.includes('apple') || text.includes('銀座') || text.includes('ginza');
-        });
+        try {
+          const allButtons = document.querySelectorAll('button');
+          appleGinzaButton = Array.from(allButtons).find(btn => {
+            try {
+              const text = btn.textContent?.toLowerCase() || '';
+              return text.includes('apple') || text.includes('銀座') || text.includes('ginza');
+            } catch (textError) {
+              console.warn('Error reading button text:', textError);
+              return false;
+            }
+          });
+        } catch (buttonError) {
+          console.warn('Error searching buttons:', buttonError);
+        }
       }
 
       if (appleGinzaButton) {
         console.log('Found Apple Ginza store button, clicking to check availability...');
-        appleGinzaButton.click();
         
-        this.notifyBackgroundScript({
-          type: 'STORE_AVAILABILITY_CHECK',
-          store: 'Apple Ginza',
-          timestamp: new Date().toISOString()
-        });
+        try {
+          appleGinzaButton.click();
+          
+          // Try to send notification, but don't fail if context is invalid
+          this.safeNotifyBackgroundScript({
+            type: 'STORE_AVAILABILITY_CHECK',
+            store: 'Apple Ginza',
+            timestamp: new Date().toISOString()
+          });
 
-        // Try multiple times to check for availability results
-        this.retryAvailabilityCheck(0);
-        
-        // Also retry store data analysis 30 times
-        this.retryStoreDataAnalysis(0);
-        return true; // Found and clicked
+          // Try multiple times to check for availability results
+          this.retryAvailabilityCheck(0);
+          
+          // Also retry store data analysis 30 times
+          this.retryStoreDataAnalysis(0);
+          return true; // Found and clicked
+        } catch (clickError) {
+          console.error('Error clicking store button:', clickError);
+          return false;
+        }
       } else {
         console.log('Apple Ginza store button not found');
         return false; // Not found
       }
     } catch (error) {
       console.error('Error checking store availability:', error);
+      
+      // If context is invalidated, try to recover
+      if (error.message && error.message.includes('Extension context invalidated')) {
+        console.log('Extension context invalidated, attempting to recover...');
+        this.handleContextInvalidation();
+      }
+      
       return false;
     }
   }
@@ -307,12 +420,22 @@ class iPhoneAvailabilityMonitor {
     }
 
     setTimeout(() => {
-      console.log(`Checking availability results (attempt ${attempt + 1}/${maxAttempts})...`);
-      const hasResults = this.checkAvailabilityResults();
-      
-      if (!hasResults && attempt < maxAttempts - 1) {
-        console.log('No results found, retrying...');
-        this.retryAvailabilityCheck(attempt + 1);
+      try {
+        console.log(`Checking availability results (attempt ${attempt + 1}/${maxAttempts})...`);
+        const hasResults = this.checkAvailabilityResults();
+        
+        if (!hasResults && attempt < maxAttempts - 1) {
+          console.log('No results found, retrying...');
+          this.retryAvailabilityCheck(attempt + 1);
+        }
+      } catch (error) {
+        console.error('Error in retryAvailabilityCheck:', error);
+        
+        // If context is invalidated, try to recover
+        if (error.message && error.message.includes('Extension context invalidated')) {
+          console.log('Extension context invalidated during retry, attempting to recover...');
+          this.handleContextInvalidation();
+        }
       }
     }, delay);
   }
@@ -471,19 +594,29 @@ class iPhoneAvailabilityMonitor {
     }
 
     setTimeout(() => {
-      console.log(`Analyzing store data (attempt ${attempt + 1}/${maxAttempts})...`);
-      
-      // Try to find the no pickup stores button first
-      const noPickupButton = this.findNoPickupButton();
-      if (noPickupButton) {
-        console.log('Found no pickup button, proceeding with analysis...');
-      }
-      
-      const hasStoreData = this.analyzeStoreData();
-      
-      if (!hasStoreData && attempt < maxAttempts - 1) {
-        console.log('No store data found, retrying...');
-        this.retryStoreDataAnalysis(attempt + 1);
+      try {
+        console.log(`Analyzing store data (attempt ${attempt + 1}/${maxAttempts})...`);
+        
+        // Try to find the no pickup stores button first
+        const noPickupButton = this.findNoPickupButton();
+        if (noPickupButton) {
+          console.log('Found no pickup button, proceeding with analysis...');
+        }
+        
+        const hasStoreData = this.analyzeStoreData();
+        
+        if (!hasStoreData && attempt < maxAttempts - 1) {
+          console.log('No store data found, retrying...');
+          this.retryStoreDataAnalysis(attempt + 1);
+        }
+      } catch (error) {
+        console.error('Error in retryStoreDataAnalysis:', error);
+        
+        // If context is invalidated, try to recover
+        if (error.message && error.message.includes('Extension context invalidated')) {
+          console.log('Extension context invalidated during store data analysis, attempting to recover...');
+          this.handleContextInvalidation();
+        }
       }
     }, delay);
   }
@@ -688,16 +821,23 @@ class iPhoneAvailabilityMonitor {
           }
         }
 
+        // Extract full text content from the dialog
+        const fullDialogText = this.extractFullDialogText(storeAvailabilityDialog);
+        if (fullDialogText) {
+          availabilityData.fullDialogText = fullDialogText;
+          console.log('Full dialog text extracted:', fullDialogText);
+        }
+
         console.log(`Store data analysis complete: ${availabilityData.stores.length} stores found`);
         console.log('Full availability data:', availabilityData);
         
-        // Only send notification if we have meaningful store data and haven't sent it yet
-        if ((availabilityData.stores.length > 0 || availabilityData.summary) && !this.storeNotificationSent) {
+        // Always send notification for store availability results (even if no stores found)
+        if (!this.storeNotificationSent) {
           console.log('Sending store availability notification with data:', availabilityData);
-          this.notifyBackgroundScript({
-            type: 'STORE_AVAILABILITY_RESULTS',
-            data: availabilityData
-          });
+        this.safeNotifyBackgroundScript({
+          type: 'STORE_AVAILABILITY_RESULTS',
+          data: availabilityData
+        });
           this.lastStoreData = availabilityData;
           this.storeNotificationSent = true;
         } else if (this.storeNotificationSent) {
@@ -709,6 +849,27 @@ class iPhoneAvailabilityMonitor {
       }
 
       console.log('Store availability dialog not found for analysis');
+      
+      // Even if no dialog found, try to send a basic notification
+      if (!this.storeNotificationSent) {
+        console.log('No store dialog found, sending basic notification');
+        const basicAvailabilityData = {
+          timestamp: new Date().toISOString(),
+          dialogType: 'no_dialog_found',
+          stores: [],
+          summary: 'Store availability dialog not found',
+          hasAvailability: false,
+          analysisAttempt: 'no_dialog'
+        };
+        
+        this.safeNotifyBackgroundScript({
+          type: 'STORE_AVAILABILITY_RESULTS',
+          data: basicAvailabilityData
+        });
+        this.lastStoreData = basicAvailabilityData;
+        this.storeNotificationSent = true;
+      }
+      
       return false; // No store data found
     } catch (error) {
       console.error('Error analyzing store data:', error);
@@ -740,6 +901,54 @@ class iPhoneAvailabilityMonitor {
     if (this.lastStoreData.summary !== newData.summary) return true;
     
     return false;
+  }
+
+  extractFullDialogText(dialogElement) {
+    try {
+      if (!dialogElement) {
+        console.log('No dialog element provided for text extraction');
+        return null;
+      }
+
+      // Get all text content from the dialog
+      const fullText = dialogElement.textContent || dialogElement.innerText || '';
+      
+      if (fullText.trim()) {
+        console.log('Extracted full dialog text length:', fullText.length);
+        return fullText.trim();
+      }
+
+      // Fallback: try to get text from specific sections
+      const sections = [
+        '.rf-productlocator-pickuploctionheader',
+        '.rf-productlocator-nopickupstores',
+        '.rf-productlocator-stores',
+        '.rf-productlocator-deliveryheader',
+        '.rf-productlocator-deliveryquotes'
+      ];
+
+      let combinedText = '';
+      sections.forEach(selector => {
+        const element = dialogElement.querySelector(selector);
+        if (element) {
+          const text = element.textContent || element.innerText || '';
+          if (text.trim()) {
+            combinedText += text.trim() + '\n\n';
+          }
+        }
+      });
+
+      if (combinedText.trim()) {
+        console.log('Extracted text from sections, length:', combinedText.length);
+        return combinedText.trim();
+      }
+
+      console.log('No text content found in dialog');
+      return null;
+    } catch (error) {
+      console.error('Error extracting full dialog text:', error);
+      return null;
+    }
   }
 
   getElementSelector(element) {
@@ -794,24 +1003,249 @@ class iPhoneAvailabilityMonitor {
     return false;
   }
 
+  safeNotifyBackgroundScript(message) {
+    try {
+      // Check if extension context is still valid
+      if (!chrome || !chrome.runtime || !chrome.runtime.sendMessage) {
+        console.warn('Extension context invalidated, cannot send message:', message);
+        return false;
+      }
+
+      chrome.runtime.sendMessage(message).catch(error => {
+        console.error('Failed to send message to background script:', error);
+        
+        // If context is invalidated, try to recover
+        if (error.message && error.message.includes('Extension context invalidated')) {
+          console.log('Extension context invalidated during message send, attempting to recover...');
+          this.handleContextInvalidation();
+        }
+      });
+      return true;
+    } catch (error) {
+      console.error('Error in safeNotifyBackgroundScript:', error);
+      return false;
+    }
+  }
+
   notifyBackgroundScript(availabilityData) {
     // Send message to background script
-    chrome.runtime.sendMessage({
+    this.safeNotifyBackgroundScript({
       type: 'AVAILABILITY_CHANGE',
       data: availabilityData
-    }).catch(error => {
-      console.error('Failed to send message to background script:', error);
     });
+  }
+
+  handleContextInvalidation() {
+    try {
+      console.log('Handling extension context invalidation...');
+      
+      // Send a fallback notification about context invalidation
+      this.sendFallbackNotification();
+      
+      // Stop current monitoring
+      this.stopMonitoring();
+      
+      // Clear any pending timeouts/intervals
+      if (this.checkInterval) {
+        clearInterval(this.checkInterval);
+        this.checkInterval = null;
+      }
+      
+      // Reset state
+      this.isMonitoring = false;
+      this.storeNotificationSent = false;
+      this.lastAvailability = null;
+      this.lastStoreData = null;
+      
+      // Try to reinitialize after a delay
+      setTimeout(() => {
+        console.log('Attempting to reinitialize after context invalidation...');
+        try {
+          this.init();
+        } catch (reinitError) {
+          console.error('Failed to reinitialize after context invalidation:', reinitError);
+        }
+      }, 5000); // Wait 5 seconds before reinitializing
+      
+    } catch (error) {
+      console.error('Error handling context invalidation:', error);
+    }
+  }
+
+  sendFallbackNotification() {
+    try {
+      // Try to send a notification about the error
+      const fallbackData = {
+        timestamp: new Date().toISOString(),
+        dialogType: 'context_invalidated',
+        stores: [],
+        summary: 'Extension context invalidated - monitoring stopped',
+        hasAvailability: false,
+        analysisAttempt: 'context_error',
+        error: 'Extension context invalidated'
+      };
+      
+      // Try to send via background script first
+      if (this.isExtensionContextValid()) {
+        this.safeNotifyBackgroundScript({
+          type: 'STORE_AVAILABILITY_RESULTS',
+          data: fallbackData
+        });
+      } else {
+        // If context is invalid, try to send via fetch directly
+        this.sendDirectNotification(fallbackData);
+      }
+    } catch (error) {
+      console.error('Error sending fallback notification:', error);
+    }
+  }
+
+  sendDirectNotification(data) {
+    try {
+      // Hardcoded webhook URL for direct notification
+      const webhookUrl = 'https://discord.com/api/webhooks/1412292401233661952/xsddZeYv18XDHsHAJgfQg0qd4FpBE678v_6ZbXN2nLrHIvo23h30rUozLizY5sbm30fW';
+      
+      const embed = {
+        title: '🚨 iPhone 17 Pro Monitor Error',
+        color: 0xff0000,
+        timestamp: data.timestamp,
+        fields: [
+          {
+            name: '❌ Error',
+            value: data.summary || 'Unknown error',
+            inline: false
+          },
+          {
+            name: '🔧 Status',
+            value: 'Extension context invalidated - monitoring stopped',
+            inline: false
+          },
+          {
+            name: '⏰ Time',
+            value: new Date().toLocaleString(),
+            inline: false
+          }
+        ],
+        footer: {
+          text: 'iPhone 17 Pro Monitor Extension - Error Report',
+          icon_url: 'https://www.apple.com/favicon.ico'
+        }
+      };
+
+      const payload = {
+        content: '🚨 **iPhone 17 Pro Monitor Error**',
+        embeds: [embed]
+      };
+
+      fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      }).then(response => {
+        if (response.ok) {
+          console.log('Fallback notification sent successfully');
+        } else {
+          console.error('Failed to send fallback notification:', response.status);
+        }
+      }).catch(error => {
+        console.error('Error sending fallback notification:', error);
+      });
+    } catch (error) {
+      console.error('Error in sendDirectNotification:', error);
+    }
   }
 }
 
 // Initialize the monitor when the page loads
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
+function initializeMonitor() {
+  try {
     new iPhoneAvailabilityMonitor();
-  });
+  } catch (error) {
+    console.error('Error initializing monitor:', error);
+    
+    // Send fallback notification about initialization error
+    if (error.message && error.message.includes('Extension context invalidated')) {
+      console.log('Extension context invalidated during initialization, sending fallback notification');
+      
+      const fallbackData = {
+        timestamp: new Date().toISOString(),
+        dialogType: 'init_error',
+        stores: [],
+        summary: 'Extension context invalidated during initialization',
+        hasAvailability: false,
+        analysisAttempt: 'init_error',
+        error: 'Extension context invalidated during initialization'
+      };
+      
+      // Try to send direct notification
+      sendDirectNotification(fallbackData);
+    }
+  }
+}
+
+function sendDirectNotification(data) {
+  try {
+    // Hardcoded webhook URL for direct notification
+    const webhookUrl = 'https://discord.com/api/webhooks/1412292401233661952/xsddZeYv18XDHsHAJgfQg0qd4FpBE678v_6ZbXN2nLrHIvo23h30rUozLizY5sbm30fW';
+    
+    const embed = {
+      title: '🚨 iPhone 17 Pro Monitor Error',
+      color: 0xff0000,
+      timestamp: data.timestamp,
+      fields: [
+        {
+          name: '❌ Error',
+          value: data.summary || 'Unknown error',
+          inline: false
+        },
+        {
+          name: '🔧 Status',
+          value: 'Extension context invalidated - monitoring stopped',
+          inline: false
+        },
+        {
+          name: '⏰ Time',
+          value: new Date().toLocaleString(),
+          inline: false
+        }
+      ],
+      footer: {
+        text: 'iPhone 17 Pro Monitor Extension - Error Report',
+        icon_url: 'https://www.apple.com/favicon.ico'
+      }
+    };
+
+    const payload = {
+      content: '🚨 **iPhone 17 Pro Monitor Error**',
+      embeds: [embed]
+    };
+
+    fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload)
+    }).then(response => {
+      if (response.ok) {
+        console.log('Fallback notification sent successfully');
+      } else {
+        console.error('Failed to send fallback notification:', response.status);
+      }
+    }).catch(error => {
+      console.error('Error sending fallback notification:', error);
+    });
+  } catch (error) {
+    console.error('Error in sendDirectNotification:', error);
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeMonitor);
 } else {
-  new iPhoneAvailabilityMonitor();
+  initializeMonitor();
 }
 
 // Also initialize on navigation changes (for SPA behavior)

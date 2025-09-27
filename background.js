@@ -627,6 +627,32 @@ class DiscordNotifier {
           }
         }
 
+        // Add full dialog text if available
+        if (data.fullDialogText && typeof data.fullDialogText === 'string' && data.fullDialogText.trim()) {
+          try {
+            // Truncate if too long (Discord has a 1024 character limit per field)
+            const maxLength = 1000;
+            let dialogText = data.fullDialogText.trim();
+            
+            if (dialogText.length > maxLength) {
+              dialogText = dialogText.substring(0, maxLength) + '...';
+            }
+            
+            embed.fields.push({
+              name: '📄 Full Dialog Text',
+              value: `\`\`\`\n${dialogText}\n\`\`\``,
+              inline: false
+            });
+          } catch (error) {
+            console.error('Error processing full dialog text:', error);
+            embed.fields.push({
+              name: '📄 Full Dialog Text',
+              value: 'Error processing dialog text',
+              inline: false
+            });
+          }
+        }
+
         embed.footer = {
           text: `Checked ${stores.length} stores • ${(data.hasAvailability === true) ? 'Some availability found' : 'No availability'}`,
           icon_url: 'https://www.apple.com/favicon.ico'
