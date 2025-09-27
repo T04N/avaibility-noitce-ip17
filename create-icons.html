@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create Extension Icons</title>
+</head>
+<body>
+    <canvas id="canvas16" width="16" height="16"></canvas>
+    <canvas id="canvas48" width="48" height="48"></canvas>
+    <canvas id="canvas128" width="128" height="128"></canvas>
+    
+    <script>
+        function createIcon(canvasId, size) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            
+            // Background
+            ctx.fillStyle = '#007AFF';
+            ctx.fillRect(0, 0, size, size);
+            
+            // iPhone icon
+            const phoneWidth = size * 0.6;
+            const phoneHeight = size * 0.8;
+            const phoneX = (size - phoneWidth) / 2;
+            const phoneY = (size - phoneHeight) / 2;
+            
+            // Phone body
+            ctx.fillStyle = '#1C1C1E';
+            ctx.fillRect(phoneX, phoneY, phoneWidth, phoneHeight);
+            
+            // Screen
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(phoneX + phoneWidth * 0.1, phoneY + phoneHeight * 0.15, phoneWidth * 0.8, phoneHeight * 0.6);
+            
+            // Home indicator
+            ctx.fillStyle = '#FFFFFF';
+            const indicatorWidth = phoneWidth * 0.3;
+            const indicatorHeight = size * 0.02;
+            ctx.fillRect(phoneX + (phoneWidth - indicatorWidth) / 2, phoneY + phoneHeight - phoneHeight * 0.1, indicatorWidth, indicatorHeight);
+            
+            // Download the icon
+            const link = document.createElement('a');
+            link.download = `icon${size}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        // Create all icons
+        createIcon('canvas16', 16);
+        createIcon('canvas48', 48);
+        createIcon('canvas128', 128);
+    </script>
+</body>
+</html>
