@@ -1,0 +1,33 @@
+{
+  "name": "iphone-17-availability-monitor",
+  "version": "1.0.0",
+  "description": "Monitor iPhone 17/17 Pro availability on Apple Japan with Discord notifications",
+  "main": "puppeteer-runner.js",
+  "scripts": {
+    "start": "node puppeteer-runner.js",
+    "start:headless": "node puppeteer-runner.js --headless",
+    "install-deps": "npm install",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "iphone",
+    "apple",
+    "availability",
+    "monitor",
+    "discord",
+    "puppeteer",
+    "browser-extension"
+  ],
+  "author": "iPhone Monitor",
+  "license": "MIT",
+  "dependencies": {
+    "puppeteer": "^21.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "local"
+  }
+}

@@ -1,101 +1,188 @@
-# iPhone 17 Pro Availability Monitor
+# iPhone 17/17 Pro Availability Monitor
 
-A browser extension that monitors iPhone 17 Pro availability on Apple's Japanese website and sends Discord notifications when availability changes.
+Automated monitoring system for iPhone 17 and iPhone 17 Pro availability on Apple Japan website with Discord notifications.
 
-## Features
+## 🚀 Features
 
-- 🔍 **Real-time Monitoring**: Automatically monitors iPhone 17 Pro availability on Apple Japan
-- 📱 **Discord Notifications**: Sends rich notifications to Discord when availability changes
-- ⚙️ **Configurable**: Customizable check intervals and notification settings
-- 🎨 **Modern UI**: Beautiful popup interface for configuration
-- 🛡️ **Spam Protection**: Built-in cooldown to prevent notification spam
+- **Auto-selection**: Automatically selects iPhone configuration options
+- **Store availability check**: Monitors in-store availability at Apple Ginza
+- **Discord notifications**: Sends real-time updates to Discord channel
+- **Auto-popup closer**: Automatically closes any popups that appear
+- **Auto-reload**: Refreshes page every 12 seconds for latest data
+- **Puppeteer integration**: Automated browser control
 
-## Installation
+## 📱 Supported Models
 
-1. Download or clone this repository
-2. Open Chrome/Edge and go to `chrome://extensions/`
-3. Enable "Developer mode" in the top right
-4. Click "Load unpacked" and select the extension folder
-5. The extension will appear in your browser toolbar
+- **iPhone 17**: Lavender, Sage, Mist Blue, White, Black
+- **iPhone 17 Pro**: Cosmic Orange, Silver, Deep Blue
 
-## Setup
+## ⚙️ Setup
 
-1. **Get Discord Webhook URL**:
-   - Go to your Discord server
-   - Server Settings → Integrations → Webhooks
-   - Create a new webhook
-   - Copy the webhook URL
+### 1. Install Dependencies
 
-2. **Configure Extension**:
-   - Click the extension icon in your browser toolbar
-   - Paste your Discord webhook URL
-   - Set your preferred check interval (minimum 10 seconds)
-   - Enable notifications
-   - Click "Save Settings"
+```bash
+npm install
+```
 
-3. **Test Setup**:
-   - Click "Test Webhook" to verify your Discord integration
-   - Navigate to the Apple iPhone 17 Pro page to start monitoring
+### 2. Configure Discord Webhook
 
-## Usage
+The Discord webhook URL is already hardcoded in the extension. If you need to change it, edit `background.js`:
 
-1. Navigate to [Apple iPhone 17 Pro page](https://www.apple.com/jp/shop/buy-iphone/iphone-17-pro/)
-2. The extension will automatically start monitoring
-3. When availability changes, you'll receive a Discord notification
-4. The extension includes spam protection (5-minute cooldown between notifications)
+```javascript
+this.webhookUrl = 'https://discord.com/api/webhooks/YOUR_WEBHOOK_URL';
+```
 
-## Files Structure
+### 3. Run the Monitor
+
+```bash
+# Run with visible browser
+npm start
+
+# Run in headless mode (background)
+npm run start:headless
+```
+
+## 🔧 Manual Extension Installation
+
+If you prefer to install the extension manually in Chrome:
+
+1. Open Chrome and go to `chrome://extensions/`
+2. Enable "Developer mode"
+3. Click "Load unpacked"
+4. Select the project folder
+5. Navigate to `https://www.apple.com/jp/shop/buy-iphone/iphone-17`
+
+## 📋 Auto-Selection Process
+
+The extension automatically:
+
+1. **Selects color**: Lavender (iPhone 17) / Cosmic Orange (iPhone 17 Pro)
+2. **Selects capacity**: 256GB
+3. **Selects trade-in**: No trade-in
+4. **Selects carrier**: SIM-free
+5. **Selects payment**: Full price
+6. **Selects AppleCare+**: None
+7. **Checks store availability**: Apple Ginza
+8. **Closes popups**: Any overlays or modals
+9. **Reloads page**: Every 12 seconds
+
+## 🔔 Discord Notifications
+
+The system sends notifications for:
+
+- ✅ **Auto-selection steps** (color, capacity, payment, etc.)
+- 🏪 **Store availability results** (available/unavailable stores)
+- ❌ **Errors** (context invalidation, popup issues)
+
+## 🛠️ Configuration
+
+### Change Reload Interval
+
+Edit `content.js`:
+
+```javascript
+// Change from 12000ms (12 seconds) to your preferred interval
+setTimeout(() => {
+  window.location.reload();
+}, 12000); // Your interval here
+```
+
+### Change Target Store
+
+Edit `content.js` in the `checkStoreAvailability()` function:
+
+```javascript
+// Change from "Apple Ginza" to your preferred store
+const storeButton = document.querySelector('button:contains("Apple Ginza")');
+```
+
+### Enable/Disable Notifications
+
+Edit `background.js`:
+
+```javascript
+// Comment out to disable startup notification
+// setTimeout(() => {
+//   this.sendStartupNotification();
+// }, 1000);
+```
+
+## 📊 Console Logs
+
+The system provides detailed console logging:
+
+- 🎨 Color selection
+- 💾 Capacity selection  
+- 💳 Payment selection
+- 🛡️ AppleCare+ selection
+- 🏪 Store availability checks
+- 🚫 Popup closing
+- 🔄 Page reloads
+
+## 🚨 Troubleshooting
+
+### Extension Context Invalidated
+
+This error occurs when the extension reloads. The system automatically handles this by:
+- Stopping current monitoring
+- Clearing intervals
+- Attempting reinitialization
+
+### Popup Issues
+
+The system automatically closes common popups including:
+- AppleCare+ overlays
+- Video players
+- Modal dialogs
+- Generic close buttons
+
+### Store Button Not Found
+
+If the store availability button isn't found:
+- Check if the page has fully loaded
+- Verify the store name matches exactly
+- Check console for error messages
+
+## 📁 File Structure
 
 ```
+iphone-17-monitor/
 ├── manifest.json          # Extension manifest
-├── background.js          # Background service worker
-├── content.js            # Content script for monitoring
-├── popup.html            # Extension popup UI
-├── popup.js              # Popup functionality
-└── README.md             # This file
+├── content.js             # Main extension logic
+├── background.js          # Discord notifications
+├── popup.html             # Extension popup UI
+├── popup.js               # Popup functionality
+├── puppeteer-runner.js    # Puppeteer automation
+├── package.json           # Dependencies
+└── README.md              # This file
 ```
 
-## Discord Notification Format
+## 🔄 Workflow
 
-The extension sends rich Discord embeds with:
-- ✅ Available items
-- ❌ Unavailable items  
-- 🛒 Buy button status
-- Direct links to the Apple page
-- Timestamps and status indicators
+1. **Puppeteer launches** Chrome with extension loaded
+2. **Navigates** to iPhone 17/17 Pro page
+3. **Extension initializes** and starts monitoring
+4. **Auto-selects** all configuration options
+5. **Checks store availability** at Apple Ginza
+6. **Sends Discord notifications** with results
+7. **Closes any popups** that appear
+8. **Reloads page** every 12 seconds
+9. **Repeats** the entire process
 
-## Privacy
+## 🎯 Target URLs
 
-- No data is collected or stored externally
-- All monitoring happens locally in your browser
-- Discord webhook URL is stored locally in browser storage
-- No tracking or analytics
+- **iPhone 17**: `https://www.apple.com/jp/shop/buy-iphone/iphone-17`
+- **iPhone 17 Pro**: `https://www.apple.com/jp/shop/buy-iphone/iphone-17-pro`
 
-## Troubleshooting
+## 📝 Notes
 
-**Extension not working?**
-- Make sure you're on the correct Apple page
-- Check that your Discord webhook URL is valid
-- Verify notifications are enabled in the popup
+- The system is designed for Japanese Apple Store
+- All text and selectors are optimized for Japanese locale
+- Discord webhook is pre-configured
+- Extension works with both iPhone 17 and iPhone 17 Pro models
+- Auto-popup closing prevents interruptions
+- 12-second reload cycle ensures fresh data
 
-**No notifications?**
-- Test your webhook URL using the "Test Webhook" button
-- Check Discord server permissions for the webhook
-- Ensure the extension has proper permissions
+## 🛑 Stopping the Monitor
 
-**High CPU usage?**
-- Increase the check interval in settings
-- The extension respects a minimum 10-second interval
-
-## Development
-
-To modify the extension:
-1. Edit the source files
-2. Go to `chrome://extensions/`
-3. Click the refresh icon on the extension
-4. Test your changes
-
-## License
-
-MIT License - Feel free to modify and distribute.
-# avaibility-noitce-ip17
+Press `Ctrl+C` in the terminal to gracefully stop the monitor and close the browser.

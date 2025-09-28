@@ -294,10 +294,13 @@ class iPhoneAvailabilityMonitor {
     // Wait for page to load completely
     setTimeout(() => {
       try {
-        this.selectColor();
-        this.selectCapacity();
-        this.selectPaymentMethod();
-        this.selectAppleCare();
+        this.selectScreenSize();    // 1. Select iPhone 17 Pro (6.3 inch)
+        this.selectColor();         // 2. Select Cosmic Orange
+        this.selectCapacity();      // 3. Select 256GB
+        this.selectTradeIn();       // 4. Select no trade-in
+        this.selectCarrier();       // 5. Select SIM-free
+        this.selectPaymentMethod(); // 6. Select full price payment
+        this.selectAppleCare();     // 7. Select no AppleCare+
         this.retryStoreAvailabilityCheck(0);
       } catch (error) {
         console.error('Error in autoSelectOptions:', error);
@@ -359,6 +362,30 @@ class iPhoneAvailabilityMonitor {
         }
       }
     }, delay);
+  }
+
+  selectScreenSize() {
+    try {
+      // Select iPhone 17 Pro (6.3 inch) first
+      const proInput = document.querySelector('input[data-autom="dimensionScreensize6_3inch"]');
+      
+      if (proInput && !proInput.checked) {
+        console.log('Selecting iPhone 17 Pro (6.3 inch)...');
+        proInput.click();
+        this.safeNotifyBackgroundScript({
+          type: 'SCREEN_SIZE_SELECTED',
+          screenSize: 'iPhone 17 Pro (6.3 inch)',
+          model: this.currentModel,
+          timestamp: new Date().toISOString()
+        });
+      } else if (proInput && proInput.checked) {
+        console.log('iPhone 17 Pro (6.3 inch) already selected');
+      } else {
+        console.log('iPhone 17 Pro (6.3 inch) option not found');
+      }
+    } catch (error) {
+      console.error('Error selecting screen size:', error);
+    }
   }
 
   selectColor() {

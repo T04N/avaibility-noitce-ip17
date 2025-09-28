@@ -63,27 +63,38 @@ class DiscordNotifier {
           break;
           
         case 'COLOR_SELECTED':
-          await this.handleColorSelection(message);
+          // Commented out to reduce spam - only log to console
+          console.log(`🎨 Color selected: ${message.color} for ${message.model}`);
           break;
           
         case 'CAPACITY_SELECTED':
-          await this.handleCapacitySelection(message);
+          // Commented out to reduce spam - only log to console
+          console.log(`💾 Capacity selected: ${message.capacity} for ${message.model}`);
           break;
           
         case 'PAYMENT_SELECTED':
-          await this.handlePaymentSelection(message);
+          // Commented out to reduce spam - only log to console
+          console.log(`💳 Payment selected: ${message.payment} for ${message.model}`);
           break;
           
         case 'APPLECARE_SELECTED':
-          await this.handleAppleCareSelection(message);
+          // Commented out to reduce spam - only log to console
+          console.log(`🛡️ AppleCare selected: ${message.applecare} for ${message.model}`);
           break;
           
         case 'TRADEIN_SELECTED':
-          await this.handleTradeInSelection(message);
+          // Commented out to reduce spam - only log to console
+          console.log(`🔄 Trade-in selected: ${message.tradeIn} for ${message.model}`);
           break;
           
         case 'CARRIER_SELECTED':
-          await this.handleCarrierSelection(message);
+          // Commented out to reduce spam - only log to console
+          console.log(`📱 Carrier selected: ${message.carrier} for ${message.model}`);
+          break;
+          
+        case 'SCREEN_SIZE_SELECTED':
+          // Commented out to reduce spam - only log to console
+          console.log(`📏 Screen size selected: ${message.screenSize} for ${message.model}`);
           break;
           
         case 'STORE_AVAILABILITY_CHECK':
@@ -513,6 +524,41 @@ class DiscordNotifier {
     }
   }
 
+  async handleScreenSizeSelection(message) {
+    try {
+      const model = (message.model && typeof message.model === 'string') ? message.model : 'iPhone 17/17 Pro';
+      const screenSize = (message.screenSize && typeof message.screenSize === 'string') ? message.screenSize : 'Unknown';
+      
+      const payload = {
+        content: `📏 **${model} Screen Size Selected: ${screenSize}**`,
+        embeds: [{
+          title: `${model} Screen Size Selection`,
+          description: `Automatically selected screen size: **${screenSize}**`,
+          color: 0x9b59b6,
+          timestamp: message.timestamp,
+          footer: {
+            text: 'Auto-selection completed',
+            icon_url: 'https://www.apple.com/favicon.ico'
+          }
+        }]
+      };
+
+      const response = await fetch(this.webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        console.log('Screen size selection notification sent');
+      }
+    } catch (error) {
+      console.error('Failed to send screen size selection notification:', error);
+    }
+  }
+
   async handleStoreAvailabilityCheck(message) {
     try {
       // Commented out to reduce spam - only log to console
@@ -716,7 +762,18 @@ class DiscordNotifier {
           }
         }
 
-        // Add full dialog text if available
+        // Add full dialog text if available - COMMENTED OUT TO REDUCE SPAM
+        // Only log to console instead of sending to Discord
+        if (data.fullDialogText && typeof data.fullDialogText === 'string' && data.fullDialogText.trim()) {
+          try {
+            console.log('Full dialog text available (not sent to Discord to reduce spam):', data.fullDialogText.substring(0, 200) + '...');
+          } catch (error) {
+            console.error('Error processing full dialog text:', error);
+          }
+        }
+        
+        // Uncomment below if you want to re-enable full dialog text in Discord notifications
+        /*
         if (data.fullDialogText && typeof data.fullDialogText === 'string' && data.fullDialogText.trim()) {
           try {
             // Truncate if too long (Discord has a 1024 character limit per field)
@@ -741,6 +798,7 @@ class DiscordNotifier {
             });
           }
         }
+        */
 
         embed.footer = {
           text: `Checked ${stores.length} stores • ${(data.hasAvailability === true) ? 'Some availability found' : 'No availability'}`,
