@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "iPhone 17 Pro Availability Monitor",
+  "name": "iPhone 17/17 Pro Availability Monitor",
   "version": "1.0",
-  "description": "Monitors iPhone 17 Pro availability on Apple Japan and sends Discord notifications",
+  "description": "Monitors iPhone 17 and iPhone 17 Pro availability on Apple Japan and sends Discord notifications",
   "permissions": [
     "storage",
     "activeTab",
@@ -17,13 +17,16 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.apple.com/jp/shop/buy-iphone/iphone-17-pro/*"],
+      "matches": [
+        "https://www.apple.com/jp/shop/buy-iphone/iphone-17-pro/*",
+        "https://www.apple.com/jp/shop/buy-iphone/iphone-17/*"
+      ],
       "js": ["content.js"],
       "run_at": "document_end"
     }
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "iPhone 17 Pro Monitor"
+    "default_title": "iPhone 17/17 Pro Monitor"
   }
 }

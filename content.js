@@ -1,4 +1,4 @@
-// Content script for monitoring iPhone 17 Pro availability
+// Content script for monitoring iPhone 17 and iPhone 17 Pro availability
 class iPhoneAvailabilityMonitor {
   constructor() {
     this.isMonitoring = false;
@@ -6,11 +6,23 @@ class iPhoneAvailabilityMonitor {
     this.lastStoreData = null;
     this.storeNotificationSent = false;
     this.checkInterval = null;
+    this.currentModel = this.detectCurrentModel();
     this.init();
   }
 
+  detectCurrentModel() {
+    const url = window.location.href;
+    if (url.includes('iphone-17-pro')) {
+      return 'iPhone 17 Pro';
+    } else if (url.includes('iphone-17')) {
+      return 'iPhone 17';
+    } else {
+      return 'iPhone 17/17 Pro';
+    }
+  }
+
   init() {
-    console.log('iPhone 17 Pro Availability Monitor initializing...');
+    console.log(`${this.currentModel} Availability Monitor initializing...`);
     
     // Check if extension context is available before starting
     if (!this.isExtensionContextValid()) {
@@ -21,9 +33,125 @@ class iPhoneAvailabilityMonitor {
       return;
     }
     
-    console.log('iPhone 17 Pro Availability Monitor initialized');
+    console.log(`${this.currentModel} Availability Monitor initialized`);
     this.startMonitoring();
     this.autoSelectOptions();
+    this.startPopupMonitor();
+    
+    // Reload page after 3 seconds
+    this.schedulePageReload();
+  }
+
+  schedulePageReload() {
+    console.log('Scheduling page reload in 3 seconds...');
+    setTimeout(() => {
+      console.log('Reloading page...');
+      window.location.reload();
+    }, 12000);
+  }
+
+  startPopupMonitor() {
+    console.log('Starting popup monitor...');
+    
+    // Monitor for popups every 500ms
+    this.popupMonitorInterval = setInterval(() => {
+      this.closePopups();
+    }, 500);
+  }
+
+  closePopups() {
+    try {
+      // Common popup close selectors
+      const closeSelectors = [
+        // General close buttons
+        'button[aria-label*="close"]',
+        'button[aria-label*="Close"]',
+        'button[aria-label*="閉じる"]',
+        'button[aria-label*="キャンセル"]',
+        'button[aria-label*="Cancel"]',
+        
+        // X buttons
+        '.close-button',
+        '.close-btn',
+        '.modal-close',
+        '.popup-close',
+        '.overlay-close',
+        
+        // Apple specific close buttons
+        '.rc-overlay-close',
+        '.as-overlay-close',
+        '.rf-overlay-close',
+        '.ac-video-icon.icon-close',
+        '.ac-video-icon.icon-share_close',
+        
+        // ESC key simulation for modals
+        '[data-autom*="close"]',
+        '[data-autom*="cancel"]',
+        
+        // Generic close elements
+        'button:contains("×")',
+        'button:contains("✕")',
+        'button:contains("Close")',
+        'button:contains("閉じる")',
+        'button:contains("キャンセル")'
+      ];
+
+      let popupClosed = false;
+
+      // Try each selector
+      for (const selector of closeSelectors) {
+        try {
+          const elements = document.querySelectorAll(selector);
+          for (const element of elements) {
+            if (element && element.offsetParent !== null) { // Check if element is visible
+              console.log(`Closing popup with selector: ${selector}`);
+              element.click();
+              popupClosed = true;
+              break;
+            }
+          }
+          if (popupClosed) break;
+        } catch (error) {
+          // Skip invalid selectors
+          continue;
+        }
+      }
+
+      // Special handling for AppleCare+ overlay
+      const appleCareOverlay = document.querySelector('.rc-overlay-popup-content');
+      if (appleCareOverlay && appleCareOverlay.offsetParent !== null) {
+        console.log('Found AppleCare+ overlay, trying to close...');
+        
+        // Try to find close button in overlay
+        const overlayCloseBtn = appleCareOverlay.querySelector('button[aria-label*="close"], button[aria-label*="Close"], button[aria-label*="閉じる"]');
+        if (overlayCloseBtn) {
+          overlayCloseBtn.click();
+          popupClosed = true;
+        } else {
+          // Try ESC key
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27 }));
+          popupClosed = true;
+        }
+      }
+
+      // Try ESC key for any visible modal/overlay
+      const visibleModals = document.querySelectorAll('.modal, .overlay, .popup, .rc-overlay, .rf-overlay');
+      for (const modal of visibleModals) {
+        if (modal && modal.offsetParent !== null) {
+          console.log('Found visible modal/overlay, sending ESC key...');
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27 }));
+          popupClosed = true;
+          break;
+        }
+      }
+
+      if (popupClosed) {
+        console.log('Popup closed successfully');
+      }
+
+    } catch (error) {
+      console.error('Error closing popups:', error);
+    }
   }
 
   isExtensionContextValid() {
@@ -155,7 +283,7 @@ class iPhoneAvailabilityMonitor {
   }
 
   autoSelectOptions() {
-    console.log('Auto-selecting iPhone options...');
+    console.log(`Auto-selecting ${this.currentModel} options...`);
     
     // Check if extension context is still valid
     if (!this.isExtensionContextValid()) {
@@ -235,30 +363,66 @@ class iPhoneAvailabilityMonitor {
 
   selectColor() {
     try {
-      // Try to select Cosmic Orange color (コズミックオレンジ)
-      const cosmicOrangeInput = document.querySelector('input[data-autom="dimensionColorcosmicorange"]');
-      if (cosmicOrangeInput && !cosmicOrangeInput.checked) {
-        console.log('Selecting Cosmic Orange color...');
-        cosmicOrangeInput.click();
+      let selectedColor = null;
+      let colorInput = null;
+      
+      if (this.currentModel === 'iPhone 17 Pro') {
+        // iPhone 17 Pro colors: Cosmic Orange, Silver, Deep Blue
+        const colorPriority = [
+          'cosmicorange', // Cosmic Orange (コズミックオレンジ)
+          'silver',       // Silver (シルバー)
+          'deepblue'      // Deep Blue (ディープブルー)
+        ];
+        
+        for (const color of colorPriority) {
+          colorInput = document.querySelector(`input[data-autom="dimensionColor${color}"]`);
+          if (colorInput) {
+            selectedColor = color;
+            break;
+          }
+        }
+      } else if (this.currentModel === 'iPhone 17') {
+        // iPhone 17 colors: Lavender, Black, White, Sage, Mist Blue
+        const colorPriority = [
+          'lavender',     // Lavender (ラベンダー)
+          'black',        // Black (ブラック)
+          'white',        // White (ホワイト)
+          'sage',         // Sage (セージ)
+          'mistblue'      // Mist Blue (ミストブルー)
+        ];
+        
+        for (const color of colorPriority) {
+          colorInput = document.querySelector(`input[data-autom="dimensionColor${color}"]`);
+          if (colorInput) {
+            selectedColor = color;
+            break;
+          }
+        }
+      } else {
+        // Fallback for unknown model
+        const fallbackColors = ['cosmicorange', 'lavender', 'silver', 'black'];
+        for (const color of fallbackColors) {
+          colorInput = document.querySelector(`input[data-autom="dimensionColor${color}"]`);
+          if (colorInput) {
+            selectedColor = color;
+            break;
+          }
+        }
+      }
+      
+      if (colorInput && !colorInput.checked) {
+        console.log(`Selecting ${selectedColor} color for ${this.currentModel}...`);
+        colorInput.click();
         this.safeNotifyBackgroundScript({
           type: 'COLOR_SELECTED',
-          color: 'cosmicorange',
+          color: selectedColor,
+          model: this.currentModel,
           timestamp: new Date().toISOString()
         });
-      } else if (cosmicOrangeInput && cosmicOrangeInput.checked) {
-        console.log('Cosmic Orange already selected');
+      } else if (colorInput && colorInput.checked) {
+        console.log(`${selectedColor} already selected for ${this.currentModel}`);
       } else {
-        // Fallback to Silver if Cosmic Orange not available
-        const silverInput = document.querySelector('input[data-autom="dimensionColorsilver"]');
-        if (silverInput && !silverInput.checked) {
-          console.log('Selecting Silver color as fallback...');
-          silverInput.click();
-          this.safeNotifyBackgroundScript({
-            type: 'COLOR_SELECTED',
-            color: 'silver',
-            timestamp: new Date().toISOString()
-          });
-        }
+        console.log(`No suitable color found for ${this.currentModel}`);
       }
     } catch (error) {
       console.error('Error selecting color:', error);
@@ -275,6 +439,7 @@ class iPhoneAvailabilityMonitor {
         this.safeNotifyBackgroundScript({
           type: 'CAPACITY_SELECTED',
           capacity: '256gb',
+          model: this.currentModel,
           timestamp: new Date().toISOString()
         });
       } else if (capacity256Input && capacity256Input.checked) {
@@ -295,6 +460,7 @@ class iPhoneAvailabilityMonitor {
         this.safeNotifyBackgroundScript({
           type: 'PAYMENT_SELECTED',
           payment: 'fullprice',
+          model: this.currentModel,
           timestamp: new Date().toISOString()
         });
       } else if (fullPriceInput && fullPriceInput.checked) {
@@ -315,6 +481,7 @@ class iPhoneAvailabilityMonitor {
         this.safeNotifyBackgroundScript({
           type: 'APPLECARE_SELECTED',
           applecare: 'none',
+          model: this.currentModel,
           timestamp: new Date().toISOString()
         });
       } else if (noAppleCareInput && noAppleCareInput.checked) {
@@ -380,6 +547,7 @@ class iPhoneAvailabilityMonitor {
           this.safeNotifyBackgroundScript({
             type: 'STORE_AVAILABILITY_CHECK',
             store: 'Apple Ginza',
+            model: this.currentModel,
             timestamp: new Date().toISOString()
           });
 
@@ -702,6 +870,7 @@ class iPhoneAvailabilityMonitor {
         let availabilityData = {
           timestamp: new Date().toISOString(),
           dialogType: 'store_availability',
+          model: this.currentModel,
           stores: [],
           summary: '',
           hasAvailability: false,
@@ -1049,6 +1218,11 @@ class iPhoneAvailabilityMonitor {
       if (this.checkInterval) {
         clearInterval(this.checkInterval);
         this.checkInterval = null;
+      }
+      
+      if (this.popupMonitorInterval) {
+        clearInterval(this.popupMonitorInterval);
+        this.popupMonitorInterval = null;
       }
       
       // Reset state

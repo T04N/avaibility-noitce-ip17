@@ -19,10 +19,10 @@ class DiscordNotifier {
 
     console.log('Discord Notifier initialized');
     
-    // Send test notification on startup
-    setTimeout(() => {
-      this.sendStartupNotification();
-    }, 2000);
+    // Send test notification on startup - DISABLED to avoid spam
+    // setTimeout(() => {
+    //   this.sendStartupNotification();
+    // }, 2000);
   }
 
   async loadSettings() {
@@ -76,6 +76,14 @@ class DiscordNotifier {
           
         case 'APPLECARE_SELECTED':
           await this.handleAppleCareSelection(message);
+          break;
+          
+        case 'TRADEIN_SELECTED':
+          await this.handleTradeInSelection(message);
+          break;
+          
+        case 'CARRIER_SELECTED':
+          await this.handleCarrierSelection(message);
           break;
           
         case 'STORE_AVAILABILITY_CHECK':
@@ -263,14 +271,14 @@ class DiscordNotifier {
   async sendStartupNotification() {
     try {
       const payload = {
-        content: '🚀 **iPhone 17 Pro Monitor Started**',
+        content: '🚀 **iPhone 17/17 Pro Monitor Started**',
         embeds: [{
           title: 'Extension Activated',
-          description: 'iPhone 17 Pro availability monitor is now active and checking every 2 seconds!',
+          description: 'iPhone 17 and iPhone 17 Pro availability monitor is now active and checking every 2 seconds!',
           color: 0x00ff00,
           timestamp: new Date().toISOString(),
           footer: {
-            text: 'Ready to monitor iPhone 17 Pro availability',
+            text: 'Ready to monitor iPhone 17/17 Pro availability',
             icon_url: 'https://www.apple.com/favicon.ico'
           }
         }]
@@ -303,12 +311,13 @@ class DiscordNotifier {
       }
       
       const color = (message.color && typeof message.color === 'string') ? message.color : 'Unknown';
+      const model = (message.model && typeof message.model === 'string') ? message.model : 'iPhone 17/17 Pro';
       const timestamp = (message.timestamp && typeof message.timestamp === 'string') ? message.timestamp : new Date().toISOString();
       
       const payload = {
-        content: `🎨 **Color Selected: ${color}**`,
+        content: `🎨 **${model} Color Selected: ${color}**`,
         embeds: [{
-          title: 'iPhone Color Selection',
+          title: `${model} Color Selection`,
           description: `Automatically selected color: **${color}**`,
           color: 0xffa500,
           timestamp: timestamp,
@@ -401,11 +410,14 @@ class DiscordNotifier {
 
   async handleAppleCareSelection(message) {
     try {
+      const model = (message.model && typeof message.model === 'string') ? message.model : 'iPhone 17/17 Pro';
+      const applecare = (message.applecare && typeof message.applecare === 'string') ? message.applecare : 'Unknown';
+      
       const payload = {
-        content: `🛡️ **AppleCare+ Selected: ${message.applecare}**`,
+        content: `🛡️ **${model} AppleCare+ Selected: ${applecare}**`,
         embeds: [{
-          title: 'iPhone AppleCare+ Selection',
-          description: `Automatically selected AppleCare+ option: **${message.applecare}**`,
+          title: `${model} AppleCare+ Selection`,
+          description: `Automatically selected AppleCare+ option: **${applecare}**`,
           color: 0xff6b6b,
           timestamp: message.timestamp,
           footer: {
@@ -431,8 +443,83 @@ class DiscordNotifier {
     }
   }
 
+  async handleTradeInSelection(message) {
+    try {
+      const model = (message.model && typeof message.model === 'string') ? message.model : 'iPhone 17/17 Pro';
+      const tradeIn = (message.tradeIn && typeof message.tradeIn === 'string') ? message.tradeIn : 'Unknown';
+      
+      const payload = {
+        content: `🔄 **${model} Trade-in Selected: ${tradeIn}**`,
+        embeds: [{
+          title: `${model} Trade-in Selection`,
+          description: `Automatically selected trade-in option: **${tradeIn}**`,
+          color: 0x4ecdc4,
+          timestamp: message.timestamp,
+          footer: {
+            text: 'Auto-selection completed',
+            icon_url: 'https://www.apple.com/favicon.ico'
+          }
+        }]
+      };
+
+      const response = await fetch(this.webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        console.log('Trade-in selection notification sent');
+      }
+    } catch (error) {
+      console.error('Failed to send trade-in selection notification:', error);
+    }
+  }
+
+  async handleCarrierSelection(message) {
+    try {
+      const model = (message.model && typeof message.model === 'string') ? message.model : 'iPhone 17/17 Pro';
+      const carrier = (message.carrier && typeof message.carrier === 'string') ? message.carrier : 'Unknown';
+      
+      const payload = {
+        content: `📱 **${model} Carrier Selected: ${carrier}**`,
+        embeds: [{
+          title: `${model} Carrier Selection`,
+          description: `Automatically selected carrier option: **${carrier}**`,
+          color: 0x45b7d1,
+          timestamp: message.timestamp,
+          footer: {
+            text: 'Auto-selection completed',
+            icon_url: 'https://www.apple.com/favicon.ico'
+          }
+        }]
+      };
+
+      const response = await fetch(this.webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        console.log('Carrier selection notification sent');
+      }
+    } catch (error) {
+      console.error('Failed to send carrier selection notification:', error);
+    }
+  }
+
   async handleStoreAvailabilityCheck(message) {
     try {
+      // Commented out to reduce spam - only log to console
+      console.log(`🏪 Checking Store Availability: ${message.store}`);
+      
+      // Uncomment below if you want to re-enable Discord notifications for store checks
+      /*
       const payload = {
         content: `🏪 **Checking Store Availability: ${message.store}**`,
         embeds: [{
@@ -458,6 +545,7 @@ class DiscordNotifier {
       if (response.ok) {
         console.log('Store availability check notification sent');
       }
+      */
     } catch (error) {
       console.error('Failed to send store availability check notification:', error);
     }
@@ -501,8 +589,9 @@ class DiscordNotifier {
         console.log('Available stores:', availableStores.length);
         console.log('Unavailable stores:', unavailableStores.length);
 
+        const model = (data.model && typeof data.model === 'string') ? data.model : 'iPhone 17/17 Pro';
         const embed = {
-          title: `🏪 iPhone 17 Pro Store Availability Results`,
+          title: `🏪 ${model} Store Availability Results`,
           color: availableStores.length > 0 ? 0x00ff00 : 0xff0000,
           timestamp: data.timestamp,
           fields: []
@@ -659,7 +748,7 @@ class DiscordNotifier {
         };
 
         const payload = {
-          content: `📱 **iPhone 17 Pro Store Availability Check Complete**`,
+          content: `📱 **${model} Store Availability Check Complete**`,
           embeds: [embed]
         };
 
