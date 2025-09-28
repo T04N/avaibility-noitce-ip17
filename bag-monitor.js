@@ -259,6 +259,9 @@ class BagStoreLocatorMonitor {
     this.lastPopupTime = null;
     this.checkInterval = null;
     this.humanBehaviorActive = false;
+    this.storeNotificationSent = false;
+    this.hasReloadScheduled = false;
+    this.popupMonitorInterval = null;
     this.ipRotationManager = new IPRotationManager();
     this.userAgentRotation = new UserAgentRotation();
     this.init();
@@ -278,6 +281,12 @@ class BagStoreLocatorMonitor {
     
     console.log('Bag Store Locator Monitor initialized');
     this.debugPageInfo();
+    
+    // Popup monitor disabled - we want to keep popups open
+    // this.startPopupMonitor();
+    
+    // Auto-select options if bag has items (from content.js logic)
+    this.autoSelectOptions();
     
     // Wait for page to be fully loaded before starting
     this.waitForPageLoad();
@@ -309,6 +318,18 @@ class BagStoreLocatorMonitor {
     
     // Also set up DOM observer to catch dynamically loaded content
     this.setupDOMObserver();
+    
+    // IMMEDIATE CLICK: Try to find and click button after 2 seconds
+    setTimeout(() => {
+      console.log('🚀 CLICK ATTEMPT: Trying to find button after 2 seconds...');
+      const immediateButton = this.findSpecificButton();
+      if (immediateButton) {
+        console.log('🎯 SUCCESS: Found button, clicking now!');
+        this.tryMultipleClickMethods(immediateButton);
+      } else {
+        console.log('⏳ Button not found yet, will retry...');
+      }
+    }, 2000); // Try after 2 seconds
   }
 
   setupDOMObserver() {
@@ -324,11 +345,14 @@ class BagStoreLocatorMonitor {
           
           if (newButtons.length > 0) {
             console.log('🆕 New buttons detected, checking for target button...');
-            const targetButton = this.findSpecificButton();
-            if (targetButton) {
-              console.log('🎯 Target button found in new content!');
-              targetButton.click();
-            }
+            setTimeout(() => {
+              const targetButton = this.findSpecificButton();
+              if (targetButton) {
+                console.log('🎯 CLICK: Target button found in new content!');
+                console.log('🚀 Clicking button after 2 seconds...');
+                this.tryMultipleClickMethods(targetButton);
+              }
+            }, 2000); // Wait 2 seconds before clicking
           }
         }
       });
@@ -417,6 +441,235 @@ class BagStoreLocatorMonitor {
     }
   }
 
+  startPopupMonitor() {
+    console.log('Starting popup monitor...');
+    
+    // Monitor for popups every 500ms
+    this.popupMonitorInterval = setInterval(() => {
+      this.closePopups();
+    }, 500);
+  }
+
+  closePopups() {
+    try {
+      // Common popup close selectors
+      const closeSelectors = [
+        // General close buttons
+        'button[aria-label*="close"]',
+        'button[aria-label*="Close"]',
+        'button[aria-label*="閉じる"]',
+        'button[aria-label*="キャンセル"]',
+        'button[aria-label*="Cancel"]',
+        
+        // X buttons
+        '.close-button',
+        '.close-btn',
+        '.modal-close',
+        '.popup-close',
+        '.overlay-close',
+        
+        // Apple specific close buttons
+        '.rc-overlay-close',
+        '.as-overlay-close',
+        '.rf-overlay-close',
+        '.ac-video-icon.icon-close',
+        '.ac-video-icon.icon-share_close',
+        
+        // ESC key simulation for modals
+        '[data-autom*="close"]',
+        '[data-autom*="cancel"]',
+        
+        // Generic close elements
+        'button:contains("×")',
+        'button:contains("✕")',
+        'button:contains("Close")',
+        'button:contains("閉じる")',
+        'button:contains("キャンセル")'
+      ];
+
+      let popupClosed = false;
+
+      // Try each selector
+      for (const selector of closeSelectors) {
+        try {
+          const elements = document.querySelectorAll(selector);
+          for (const element of elements) {
+            if (element && element.offsetParent !== null) { // Check if element is visible
+              console.log(`Closing popup with selector: ${selector}`);
+              element.click();
+              popupClosed = true;
+              break;
+            }
+          }
+          if (popupClosed) break;
+        } catch (error) {
+          // Skip invalid selectors
+          continue;
+        }
+      }
+
+      // Special handling for AppleCare+ overlay
+      const appleCareOverlay = document.querySelector('.rc-overlay-popup-content');
+      if (appleCareOverlay && appleCareOverlay.offsetParent !== null) {
+        console.log('Found AppleCare+ overlay, trying to close...');
+        
+        // Try to find close button in overlay
+        const overlayCloseBtn = appleCareOverlay.querySelector('button[aria-label*="close"], button[aria-label*="Close"], button[aria-label*="閉じる"]');
+        if (overlayCloseBtn) {
+          overlayCloseBtn.click();
+          popupClosed = true;
+        } else {
+          // Try ESC key
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27 }));
+          popupClosed = true;
+        }
+      }
+
+      // Try ESC key for any visible modal/overlay
+      const visibleModals = document.querySelectorAll('.modal, .overlay, .popup, .rc-overlay, .rf-overlay');
+      for (const modal of visibleModals) {
+        if (modal && modal.offsetParent !== null) {
+          console.log('Found visible modal/overlay, sending ESC key...');
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27 }));
+          popupClosed = true;
+          break;
+        }
+      }
+
+      if (popupClosed) {
+        console.log('Popup closed successfully');
+      }
+
+    } catch (error) {
+      console.error('Error closing popups:', error);
+    }
+  }
+
+  scheduleReloadAfterNotification() {
+    try {
+      if (this.hasReloadScheduled) return;
+      this.hasReloadScheduled = true;
+      const delay = 60000; // 60 seconds (1 minute)
+      console.log(`Scheduling reload after notification in ${delay}ms (1 minute)...`);
+      setTimeout(() => {
+        try {
+          console.log('Reloading page after 1 minute...');
+          window.location.reload();
+        } catch (error) {
+          console.error('Failed to reload page after notification:', error);
+        }
+      }, delay);
+    } catch (error) {
+      console.error('Error scheduling reload after notification:', error);
+    }
+  }
+
+  autoSelectOptions() {
+    console.log('Auto-selecting bag options...');
+    
+    // Check if extension context is still valid
+    if (!this.isExtensionContextValid()) {
+      console.error('Extension context invalid, cannot auto-select options');
+      return;
+    }
+    
+    // Wait for page to load completely
+    setTimeout(() => {
+      try {
+        this.selectColor();
+        this.selectCapacity();
+        this.selectPaymentMethod();
+        this.selectAppleCare();
+      } catch (error) {
+        console.error('Error in autoSelectOptions:', error);
+      }
+    }, 2000);
+  }
+
+  selectColor() {
+    try {
+      // Select Cosmic Orange for iPhone 17 Pro
+      const cosmicOrangeInput = document.querySelector('input[data-autom="dimensionColorcosmicorange"]');
+      if (cosmicOrangeInput && !cosmicOrangeInput.checked) {
+        console.log('Selecting Cosmic Orange color...');
+        cosmicOrangeInput.click();
+        this.safeNotifyBackgroundScript({
+          type: 'COLOR_SELECTED',
+          color: 'cosmicorange',
+          model: 'iPhone 17 Pro',
+          timestamp: new Date().toISOString()
+        });
+      } else if (cosmicOrangeInput && cosmicOrangeInput.checked) {
+        console.log('Cosmic Orange already selected');
+      }
+    } catch (error) {
+      console.error('Error selecting color:', error);
+    }
+  }
+
+  selectCapacity() {
+    try {
+      // Select 256GB capacity
+      const capacity256Input = document.querySelector('input[data-autom="dimensionCapacity256gb"]');
+      if (capacity256Input && !capacity256Input.checked) {
+        console.log('Selecting 256GB capacity...');
+        capacity256Input.click();
+        this.safeNotifyBackgroundScript({
+          type: 'CAPACITY_SELECTED',
+          capacity: '256gb',
+          model: 'iPhone 17 Pro',
+          timestamp: new Date().toISOString()
+        });
+      } else if (capacity256Input && capacity256Input.checked) {
+        console.log('256GB already selected');
+      }
+    } catch (error) {
+      console.error('Error selecting capacity:', error);
+    }
+  }
+
+  selectPaymentMethod() {
+    try {
+      // Select full price payment method (一括払い)
+      const fullPriceInput = document.querySelector('input[data-autom="purchaseGroupOptionfullprice"]');
+      if (fullPriceInput && !fullPriceInput.checked) {
+        console.log('Selecting full price payment method...');
+        fullPriceInput.click();
+        this.safeNotifyBackgroundScript({
+          type: 'PAYMENT_SELECTED',
+          payment: 'fullprice',
+          model: 'iPhone 17 Pro',
+          timestamp: new Date().toISOString()
+        });
+      } else if (fullPriceInput && fullPriceInput.checked) {
+        console.log('Full price payment already selected');
+      }
+    } catch (error) {
+      console.error('Error selecting payment method:', error);
+    }
+  }
+
+  selectAppleCare() {
+    try {
+      // Select "No AppleCare+" option (AppleCare+による保証なし)
+      const noAppleCareInput = document.querySelector('input[data-autom="noapplecare"]');
+      if (noAppleCareInput && !noAppleCareInput.checked) {
+        console.log('Selecting No AppleCare+ option...');
+        noAppleCareInput.click();
+        this.safeNotifyBackgroundScript({
+          type: 'APPLECARE_SELECTED',
+          applecare: 'none',
+          model: 'iPhone 17 Pro',
+          timestamp: new Date().toISOString()
+        });
+      } else if (noAppleCareInput && noAppleCareInput.checked) {
+        console.log('No AppleCare+ already selected');
+      }
+    } catch (error) {
+      console.error('Error selecting AppleCare option:', error);
+    }
+  }
+
   startMonitoring() {
     if (this.isMonitoring) return;
     
@@ -433,6 +686,17 @@ class BagStoreLocatorMonitor {
     if (isEmpty) {
       console.log('🛒 Bag is empty - No monitoring needed');
       console.log('Will check again in 30 seconds...');
+      
+      // Send notification about empty bag
+      this.safeNotifyBackgroundScript({
+        type: 'BAG_EMPTY',
+        data: {
+          timestamp: new Date().toISOString(),
+          message: 'Bag is empty - no items to monitor',
+          page: 'bag'
+        }
+      });
+      
       setTimeout(() => {
         console.log('🔄 Rechecking bag status...');
         this.startMonitoring();
@@ -446,15 +710,18 @@ class BagStoreLocatorMonitor {
     // Check for popup first
     this.checkForStoreLocatorPopup();
     
-    // IMMEDIATELY try to find and click store locator button
-    console.log('🔍 Looking for store locator button immediately...');
-    const buttonFound = this.findAndClickStoreLocatorButton();
-    
-    // If button not found immediately, retry with delays
-    if (!buttonFound) {
-      console.log('⏳ Button not found immediately, retrying with delays...');
-      this.retryFindButton();
-    }
+    // Try to find and click store locator button after 2 seconds
+    console.log('🚀 SEARCH: Looking for store locator button after 2 seconds...');
+    setTimeout(() => {
+      const buttonFound = this.findAndClickStoreLocatorButton();
+      
+      if (buttonFound) {
+        console.log('✅ Button found and clicked!');
+      } else {
+        console.log('⏳ Button not found, retrying with delays...');
+        this.retryFindButton();
+      }
+    }, 2000); // Wait 2 seconds before clicking
     
     // Check with random intervals (3-7 seconds) to avoid detection
     this.scheduleNextCheck();
@@ -713,19 +980,151 @@ class BagStoreLocatorMonitor {
     }
   }
 
+  tryMultipleClickMethods(button) {
+    try {
+      console.log('🔄 Trying multiple click methods...');
+      
+      // Check button state first
+      console.log('Button state check:', {
+        visible: button.offsetParent !== null,
+        enabled: !button.disabled,
+        display: getComputedStyle(button).display,
+        visibility: getComputedStyle(button).visibility,
+        opacity: getComputedStyle(button).opacity
+      });
+      
+      if (button.disabled) {
+        console.log('❌ Button is disabled, cannot click');
+        return false;
+      }
+      
+      if (button.offsetParent === null) {
+        console.log('❌ Button is not visible, cannot click');
+        return false;
+      }
+      
+      // Method 1: Direct click (from working logic)
+      try {
+        console.log('Method 1: Direct click');
+        button.click();
+        console.log('✅ Direct click successful!');
+        
+        // Wait a bit and check if popup appeared
+        setTimeout(() => {
+          this.checkForStoreLocatorPopup();
+        }, 1000);
+        
+        return true;
+      } catch (error) {
+        console.log('❌ Direct click failed:', error.message);
+      }
+      
+      // Method 2: Focus and click (from working logic)
+      try {
+        console.log('Method 2: Focus and click');
+        button.focus();
+        button.click();
+        console.log('✅ Focus and click successful!');
+        
+        // Wait a bit and check if popup appeared
+        setTimeout(() => {
+          this.checkForStoreLocatorPopup();
+        }, 1000);
+        
+        return true;
+      } catch (error) {
+        console.log('❌ Focus and click failed:', error.message);
+      }
+      
+      // Method 3: Mouse events sequence
+      try {
+        console.log('Method 3: Mouse events sequence');
+        const rect = button.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        
+        // Create and dispatch mouse events
+        const mouseDownEvent = new MouseEvent('mousedown', {
+          view: window,
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y,
+          button: 0
+        });
+        
+        const mouseUpEvent = new MouseEvent('mouseup', {
+          view: window,
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y,
+          button: 0
+        });
+        
+        const clickEvent = new MouseEvent('click', {
+          view: window,
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y,
+          button: 0
+        });
+        
+        button.dispatchEvent(mouseDownEvent);
+        setTimeout(() => {
+          button.dispatchEvent(mouseUpEvent);
+          setTimeout(() => {
+            button.dispatchEvent(clickEvent);
+          }, 10);
+        }, 10);
+        
+        console.log('✅ Mouse events sequence successful!');
+        
+        // Wait a bit and check if popup appeared
+        setTimeout(() => {
+          this.checkForStoreLocatorPopup();
+        }, 1000);
+        
+        return true;
+      } catch (error) {
+        console.log('❌ Mouse events failed:', error.message);
+      }
+      
+      // Method 4: Human simulation
+      try {
+        console.log('Method 4: Human simulation');
+        this.simulateHumanInteraction(button);
+        console.log('✅ Human simulation initiated!');
+        return true;
+      } catch (error) {
+        console.log('❌ Human simulation failed:', error.message);
+      }
+      
+      console.log('❌ All click methods failed');
+      return false;
+      
+    } catch (error) {
+      console.error('Error in tryMultipleClickMethods:', error);
+      return false;
+    }
+  }
+
   findSpecificButton() {
     try {
-      // Look for the exact button pattern you mentioned
-      const specificSelectors = [
-        'button[id*="shoppingCart.items.item-"][id*="delivery.storeLocatorView"]',
+      console.log('🔍 Searching for store locator button...');
+      
+      // Method 1: Look for buttons with specific class combination
+      const classSelectors = [
+        'button.as-buttonlink.icon-after.icon-pluscircle[data-autom="bag-seemorestores-link"]',
         'button[class*="as-buttonlink"][class*="icon-pluscircle"][data-autom="bag-seemorestores-link"]',
         'button[data-autom="bag-seemorestores-link"]'
       ];
       
-      for (const selector of specificSelectors) {
+      for (const selector of classSelectors) {
         const button = document.querySelector(selector);
         if (button) {
-          console.log('🎯 Found specific button with selector:', selector);
+          console.log('🎯 Found button with class selector:', selector);
           console.log('Button details:', {
             id: button.id,
             text: button.textContent?.trim(),
@@ -736,12 +1135,40 @@ class BagStoreLocatorMonitor {
         }
       }
       
-      // Also look for buttons containing "Apple 表参道" text
-      const allButtons = document.querySelectorAll('button');
-      for (const button of allButtons) {
+      // Method 2: Look for buttons with ID pattern (dynamic UUID) - ENHANCED
+      const idPatternSelectors = [
+        'button[id*="shoppingCart.items.item-"][id*="delivery.storeLocatorView"]',
+        'button[id*="item-"][id*="delivery.storeLocatorView"]',
+        'button[id*="shoppingCart"][id*="storeLocatorView"]',
+        'button[id*="delivery.storeLocatorView"]',
+        'button[id*="storeLocatorView"]'
+      ];
+      
+      for (const selector of idPatternSelectors) {
+        const button = document.querySelector(selector);
+        if (button) {
+          console.log('🎯 Found button with ID pattern:', selector);
+          console.log('Button details:', {
+            id: button.id,
+            text: button.textContent?.trim(),
+            classes: button.className,
+            dataAutom: button.getAttribute('data-autom')
+          });
+          return button;
+        }
+      }
+      
+      // Method 3: Look for buttons containing Apple store names (ENHANCED)
+      console.log('🔍 Searching by text content...');
+      const textButtons = document.querySelectorAll('button');
+      for (const button of textButtons) {
         const text = button.textContent?.trim() || '';
-        if (text.includes('Apple 表参道') || text.includes('表参道')) {
-          console.log('🎯 Found button with "表参道" text:', {
+        if (text.includes('Apple 渋谷') || text.includes('渋谷') ||
+            text.includes('Apple 表参道') || text.includes('表参道') ||
+            text.includes('Apple 丸の内') || text.includes('丸の内') ||
+            text.includes('Apple 銀座') || text.includes('銀座') ||
+            text.includes('Apple 新宿') || text.includes('新宿')) {
+          console.log('🎯 Found button with Apple store text:', {
             id: button.id,
             text: text,
             classes: button.className,
@@ -750,6 +1177,50 @@ class BagStoreLocatorMonitor {
           return button;
         }
       }
+      
+      // Method 4: Look for any button with store locator attributes (ENHANCED)
+      const attributeSelectors = [
+        'button[data-autom*="store"]',
+        'button[data-autom*="locator"]',
+        'button[data-autom*="more"]',
+        'button[class*="storeLocatorView"]',
+        'button[class*="as-buttonlink"][class*="icon-pluscircle"]'
+      ];
+      
+      for (const selector of attributeSelectors) {
+        const button = document.querySelector(selector);
+        if (button) {
+          const text = button.textContent?.trim() || '';
+          if (text.includes('Apple') || text.includes('渋谷') || text.includes('表参道') || 
+              text.includes('丸の内') || text.includes('銀座') || text.includes('新宿')) {
+            console.log('🎯 Found button with attribute selector:', selector);
+            console.log('Button details:', {
+              id: button.id,
+              text: text,
+              classes: button.className,
+              dataAutom: button.getAttribute('data-autom')
+            });
+            return button;
+          }
+        }
+      }
+      
+      console.log('❌ No store locator button found with any method');
+      
+      // Debug: Show all available buttons
+      console.log('🔍 DEBUG: All buttons on page:');
+      const debugButtons = document.querySelectorAll('button');
+      debugButtons.forEach((btn, index) => {
+        if (index < 20) { // Show first 20 buttons
+          console.log(`Button ${index + 1}:`, {
+            id: btn.id,
+            text: btn.textContent?.trim(),
+            classes: btn.className,
+            dataAutom: btn.getAttribute('data-autom'),
+            type: btn.type
+          });
+        }
+      });
       
       return null;
     } catch (error) {
@@ -767,19 +1238,13 @@ class BagStoreLocatorMonitor {
         console.log('✅ Found specific button pattern!');
         console.log('🚀 Clicking button immediately...');
         
-        // Try immediate click first
-        try {
-          specificButton.click();
-          console.log('✅ Button clicked successfully!');
-        } catch (clickError) {
-          console.log('⚠️ Direct click failed, trying human simulation...');
-          this.simulateHumanInteraction(specificButton);
-        }
+        // Try multiple click methods
+        this.tryMultipleClickMethods(specificButton);
         
         return true;
       }
       
-      // Look for store locator buttons with multiple selectors
+      // Look for store locator buttons with multiple selectors (from working logic)
       const selectors = [
         'button[data-autom="bag-seemorestores-link"]',
         'button.as-buttonlink.icon-after.icon-pluscircle',
@@ -811,11 +1276,11 @@ class BagStoreLocatorMonitor {
         }
       }
 
-      // If not found with selectors, look for any button containing "Apple" or store names
+      // If not found with selectors, look for any button containing "Apple" or store names (from working logic)
       if (!storeLocatorButton) {
         try {
-          const allButtons = document.querySelectorAll('button');
-          storeLocatorButton = Array.from(allButtons).find(btn => {
+          const fallbackButtons = document.querySelectorAll('button');
+          storeLocatorButton = Array.from(fallbackButtons).find(btn => {
             try {
               const text = btn.textContent?.toLowerCase() || '';
               const id = btn.id?.toLowerCase() || '';
@@ -866,7 +1331,7 @@ class BagStoreLocatorMonitor {
       }
 
       if (storeLocatorButton) {
-        console.log('✅ Found store locator button, simulating human-like interaction...');
+        console.log('✅ Found store locator button, clicking immediately...');
         console.log('Button details:', {
           id: storeLocatorButton.id,
           text: storeLocatorButton.textContent?.trim(),
@@ -875,18 +1340,24 @@ class BagStoreLocatorMonitor {
         });
         
         try {
-          // Simulate human-like behavior with hover first
-          this.simulateHumanInteraction(storeLocatorButton);
+          // Use the working click logic from content.js
+          console.log('Clicking store locator button...');
+          storeLocatorButton.click();
+          
+          // Wait a bit and check if popup appeared
+          setTimeout(() => {
+            this.checkForStoreLocatorPopup();
+          }, 1000);
           
           // Log button click (no Discord notification)
-          console.log('Store locator button interaction:', {
+          console.log('Store locator button clicked:', {
             text: storeLocatorButton.textContent?.trim(),
             timestamp: new Date().toISOString()
           });
 
           return true; // Found and clicked
         } catch (clickError) {
-          console.error('Error interacting with store locator button:', clickError);
+          console.error('Error clicking store locator button:', clickError);
           return false;
         }
       } else {
@@ -1162,21 +1633,20 @@ class BagStoreLocatorMonitor {
 
       console.log('Extracted store locator data:', storeData);
       
-      // Send notification to background script
+      // Send notification to background script and wait for success
       this.safeNotifyBackgroundScript({
         type: 'BAG_STORE_LOCATOR_POPUP',
         data: storeData
-      });
-
-      // Reload page after sending notification to refresh state
-      setTimeout(() => {
-        try {
-          console.log('Reloading bag page after 45 seconds to get fresh data...');
-          window.location.reload();
-        } catch (e) {
-          console.error('Failed to reload page:', e);
+      }).then((success) => {
+        if (success) {
+          console.log('✅ Discord notification sent successfully, scheduling reload in 45 seconds...');
+          this.scheduleReloadAfterNotification();
+        } else {
+          console.log('❌ Discord notification failed, not scheduling reload');
         }
-      }, 45000);
+      }).catch((error) => {
+        console.error('❌ Error sending Discord notification:', error);
+      });
 
     } catch (error) {
       console.error('Error extracting store locator data:', error);
@@ -1201,6 +1671,7 @@ class BagStoreLocatorMonitor {
       
       // Reset failed count on successful notification
       this.ipRotationManager.failedNotificationCount = 0;
+      console.log('✅ Notification sent successfully to background script');
       return true;
       
     } catch (error) {

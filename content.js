@@ -39,7 +39,8 @@ class iPhoneAvailabilityMonitor {
     this.autoSelectOptions();
     this.startPopupMonitor();
     
-    // Reloading is now handled after notifications to avoid detection
+    // Auto-reload cycle: Open dialog → Wait 45s → Reload
+    this.startAutoReloadCycle();
   }
 
   schedulePageReload() {
@@ -50,15 +51,85 @@ class iPhoneAvailabilityMonitor {
     }, 12000);
   }
 
+  startAutoReloadCycle() {
+    console.log('🔄 Starting auto-reload cycle...');
+    
+    // Wait for page to be fully loaded
+    setTimeout(() => {
+      console.log('🚀 Auto-reload cycle: Opening dialog...');
+      this.openStoreAvailabilityDialog();
+      
+      // After opening dialog, wait 1 minute then reload
+      setTimeout(() => {
+        console.log('⏰ Auto-reload cycle: 1 minute elapsed, reloading page...');
+        window.location.reload();
+      }, 60000); // 60 seconds (1 minute)
+      
+    }, 3000); // Wait 3 seconds for page to load
+  }
+
+  openStoreAvailabilityDialog() {
+    try {
+      console.log('🔍 Looking for store availability button...');
+      
+      // Look for Apple Ginza store availability button
+      const selectors = [
+        'button[data-ase-overlay="buac-overlay"]',
+        'button.as-retailavailabilitytrigger-infobutton',
+        'button.retail-availability-search-trigger',
+        'button[data-ase-click="show"]'
+      ];
+
+      let storeButton = null;
+      for (const selector of selectors) {
+        try {
+          storeButton = document.querySelector(selector);
+          if (storeButton) break;
+        } catch (selectorError) {
+          console.warn('Error with selector:', selector, selectorError);
+          continue;
+        }
+      }
+
+      // If not found with selectors, look for any button containing "Apple" or "銀座"
+      if (!storeButton) {
+        try {
+          const allButtons = document.querySelectorAll('button');
+          storeButton = Array.from(allButtons).find(btn => {
+            try {
+              const text = btn.textContent?.toLowerCase() || '';
+              return text.includes('apple') || text.includes('銀座') || text.includes('ginza');
+            } catch (textError) {
+              console.warn('Error reading button text:', textError);
+              return false;
+            }
+          });
+        } catch (buttonError) {
+          console.warn('Error searching buttons:', buttonError);
+        }
+      }
+
+      if (storeButton) {
+        console.log('✅ Found store button, clicking to open dialog...');
+        storeButton.click();
+        console.log('🎯 Store availability dialog opened!');
+      } else {
+        console.log('❌ Store availability button not found');
+      }
+    } catch (error) {
+      console.error('Error opening store availability dialog:', error);
+    }
+  }
+
   scheduleReloadAfterNotification() {
     try {
       if (this.hasReloadScheduled) return;
       this.hasReloadScheduled = true;
-      const delay = Math.floor(1500 + Math.random() * 2000); // 1.5s - 3.5s
-      console.log(`Scheduling reload after notification in ${delay}ms...`);
+      const delay = 60000; // 60 seconds (1 minute)
+      console.log(`Scheduling reload after notification in ${delay}ms (1 minute)...`);
       setTimeout(() => {
         try {
-          console.log('Reloading page after notification...');
+          console.log('Reloading page after 1 minute...');
           window.location.reload();
         } catch (error) {
           console.error('Failed to reload page after notification:', error);
