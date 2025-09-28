@@ -990,12 +990,7 @@ class iPhoneAvailabilityMonitor {
           }
         }
 
-        // Extract full text content from the dialog
-        const fullDialogText = this.extractFullDialogText(storeAvailabilityDialog);
-        if (fullDialogText) {
-          availabilityData.fullDialogText = fullDialogText;
-          console.log('Full dialog text extracted:', fullDialogText);
-        }
+        // Full dialog text extraction removed to avoid sending large notifications
 
         console.log(`Store data analysis complete: ${availabilityData.stores.length} stores found`);
         console.log('Full availability data:', availabilityData);
@@ -1072,53 +1067,7 @@ class iPhoneAvailabilityMonitor {
     return false;
   }
 
-  extractFullDialogText(dialogElement) {
-    try {
-      if (!dialogElement) {
-        console.log('No dialog element provided for text extraction');
-        return null;
-      }
-
-      // Get all text content from the dialog
-      const fullText = dialogElement.textContent || dialogElement.innerText || '';
-      
-      if (fullText.trim()) {
-        console.log('Extracted full dialog text length:', fullText.length);
-        return fullText.trim();
-      }
-
-      // Fallback: try to get text from specific sections
-      const sections = [
-        '.rf-productlocator-pickuploctionheader',
-        '.rf-productlocator-nopickupstores',
-        '.rf-productlocator-stores',
-        '.rf-productlocator-deliveryheader',
-        '.rf-productlocator-deliveryquotes'
-      ];
-
-      let combinedText = '';
-      sections.forEach(selector => {
-        const element = dialogElement.querySelector(selector);
-        if (element) {
-          const text = element.textContent || element.innerText || '';
-          if (text.trim()) {
-            combinedText += text.trim() + '\n\n';
-          }
-        }
-      });
-
-      if (combinedText.trim()) {
-        console.log('Extracted text from sections, length:', combinedText.length);
-        return combinedText.trim();
-      }
-
-      console.log('No text content found in dialog');
-      return null;
-    } catch (error) {
-      console.error('Error extracting full dialog text:', error);
-      return null;
-    }
-  }
+  // extractFullDialogText function removed to avoid sending large notifications
 
   getElementSelector(element) {
     if (element.id) return `#${element.id}`;
