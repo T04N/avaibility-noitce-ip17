@@ -1,0 +1,52 @@
+{
+  "proxy": {
+    "host": "choip.mproxy.vn",
+    "port": 12271,
+    "username": "tev",
+    "password": "B4a9yGhNsiNre0B",
+    "protocol": "http"
+  },
+  "browser_configs": {
+    "chrome": {
+      "command_line": "--proxy-server=http://tev:B4a9yGhNsiNre0B@choip.mproxy.vn:12271",
+      "extension": "Proxy SwitchyOmega",
+      "settings": {
+        "http_proxy": "choip.mproxy.vn:12271",
+        "https_proxy": "choip.mproxy.vn:12271",
+        "username": "tev",
+        "password": "B4a9yGhNsiNre0B"
+      }
+    },
+    "firefox": {
+      "manual_config": {
+        "http_proxy": "choip.mproxy.vn",
+        "http_port": 12271,
+        "https_proxy": "choip.mproxy.vn", 
+        "https_port": 12271,
+        "username": "tev",
+        "password": "B4a9yGhNsiNre0B"
+      },
+      "pac_file": "function FindProxyForURL(url, host) { return 'PROXY choip.mproxy.vn:12271'; }"
+    },
+    "edge": {
+      "command_line": "--proxy-server=http://tev:B4a9yGhNsiNre0B@choip.mproxy.vn:12271",
+      "settings": {
+        "http_proxy": "choip.mproxy.vn:12271",
+        "https_proxy": "choip.mproxy.vn:12271"
+      }
+    }
+  },
+  "rotation_settings": {
+    "interval_minutes": 5,
+    "max_rotations": 10,
+    "clear_data": true,
+    "user_agent_rotation": true,
+    "random_delays": true
+  },
+  "test_urls": [
+    "https://httpbin.org/ip",
+    "https://httpbin.org/headers", 
+    "https://www.apple.com/jp/shop/bag",
+    "https://www.apple.com/jp/shop/buy-iphone/iphone-17-pro"
+  ]
+}

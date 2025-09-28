@@ -23,6 +23,13 @@
       ],
       "js": ["content.js"],
       "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "https://www.apple.com/jp/shop/bag"
+      ],
+      "js": ["bag-monitor.js"],
+      "run_at": "document_end"
     }
   ],
   "action": {

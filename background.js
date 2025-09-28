@@ -94,6 +94,16 @@ class DiscordNotifier {
           await this.handleStoreAvailabilityResults(message);
           break;
           
+        case 'BAG_STORE_LOCATOR_POPUP':
+          const popupResult = await this.handleBagStoreLocatorPopup(message);
+          sendResponse(popupResult || { success: true });
+          break;
+          
+        case 'BAG_STORE_LOCATOR_BUTTON_CLICKED':
+          // Disabled to avoid spam - only log to console
+          console.log('Bag store locator button clicked:', message.data);
+          break;
+          
         case 'GET_SETTINGS':
           sendResponse({
             webhookUrl: this.webhookUrl,
@@ -792,6 +802,190 @@ class DiscordNotifier {
       }
     } catch (error) {
       console.error('Failed to send store availability results notification:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        messageData: message
+      });
+    }
+  }
+
+  async handleBagStoreLocatorPopup(message) {
+    try {
+      console.log('Received bag store locator popup message:', message);
+      
+      const data = message.data;
+      
+      // Validate data structure
+      if (!data) {
+        console.error('No data provided in bag store locator message');
+        return;
+      }
+      
+      if (typeof data !== 'object') {
+        console.error('Bag store locator data is not an object:', typeof data);
+        return;
+      }
+      
+      console.log('Processing bag store locator popup:', data);
+      
+      // Ensure stores array exists and is valid
+      const stores = Array.isArray(data.stores) ? data.stores : [];
+      console.log('Processing bag stores:', stores.length, 'stores found');
+      
+      const availableStores = stores.filter(store => {
+        if (!store || typeof store !== 'object') return false;
+        return store.isAvailable === true;
+      });
+      
+      const unavailableStores = stores.filter(store => {
+        if (!store || typeof store !== 'object') return false;
+        return store.isAvailable === false;
+      });
+      
+      console.log('Available bag stores:', availableStores.length);
+      console.log('Unavailable bag stores:', unavailableStores.length);
+
+      const embed = {
+        title: '🛒 Bag Store Locator Popup Detected',
+        color: 0xffa500,
+        timestamp: data.timestamp,
+        fields: []
+      };
+
+      // Postal code
+      if (data.postalCode && typeof data.postalCode === 'string' && data.postalCode.trim()) {
+        embed.fields.push({
+          name: '📮 Postal Code',
+          value: data.postalCode.trim(),
+          inline: false
+        });
+      }
+
+      // Always show No Available Stores in this minimal alert
+      embed.fields.push({
+        name: '❌ No Available Stores',
+        value: 'No stores have the item in stock for pickup',
+        inline: false
+      });
+
+      // Unavailable stores (max 5)
+      if (unavailableStores.length > 0) {
+        const storeTexts = unavailableStores.slice(0, 5).map(store => {
+          const name = (store.name && typeof store.name === 'string') ? store.name.trim() : 'Unknown Store';
+          const status = (store.status && typeof store.status === 'string') ? store.status.trim() : 'Not available';
+          return `• ${name} - ${status}`;
+        });
+        embed.fields.push({
+          name: '🚫 Unavailable Stores',
+          value: storeTexts.join('\n'),
+          inline: false
+        });
+      }
+
+      const timeText = new Date().toLocaleTimeString();
+      embed.footer = {
+        text: `Bag Store Locator • ${stores.length} stores checked • No availability•${timeText}`,
+        icon_url: 'https://www.apple.com/favicon.ico'
+      };
+
+      const payload = {
+        content: '🛒 **Apple Bag Store Locator Popup Detected**',
+        embeds: [embed]
+      };
+
+      const response = await fetch(this.webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        console.log('Bag store locator popup notification sent');
+        return { success: true };
+      } else {
+        console.error('Failed to send bag store locator notification:', response.status);
+        return { success: false, error: `HTTP ${response.status}` };
+      }
+    } catch (error) {
+      console.error('Failed to send bag store locator popup notification:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        messageData: message
+      });
+      return { success: false, error: error.message };
+    }
+  }
+
+  async handleBagStoreLocatorButtonClicked(message) {
+    try {
+      console.log('Received bag store locator button clicked message:', message);
+      
+      const data = message.data;
+      
+      // Validate data structure
+      if (!data) {
+        console.error('No data provided in bag store locator button message');
+        return;
+      }
+      
+      if (typeof data !== 'object') {
+        console.error('Bag store locator button data is not an object:', typeof data);
+        return;
+      }
+      
+      console.log('Processing bag store locator button click:', data);
+
+      const embed = {
+        title: '🛒 Bag Store Locator Button Clicked',
+        color: 0x3498db,
+        timestamp: data.timestamp,
+        fields: [
+          {
+            name: '🔘 Button Text',
+            value: data.buttonText || 'Unknown button',
+            inline: false
+          },
+          {
+            name: '📍 Page',
+            value: data.page || 'bag',
+            inline: false
+          },
+          {
+            name: '⚡ Action',
+            value: data.action || 'button_clicked',
+            inline: false
+          }
+        ],
+        footer: {
+          text: 'Bag Store Locator Monitor • Button Clicked',
+          icon_url: 'https://www.apple.com/favicon.ico'
+        }
+      };
+
+      const payload = {
+        content: '🛒 **Apple Bag Store Locator Button Clicked**',
+        embeds: [embed]
+      };
+
+      const response = await fetch(this.webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        console.log('Bag store locator button click notification sent');
+      } else {
+        console.error('Failed to send bag store locator button notification:', response.status);
+      }
+    } catch (error) {
+      console.error('Failed to send bag store locator button click notification:', error);
       console.error('Error details:', {
         message: error.message,
         stack: error.stack,

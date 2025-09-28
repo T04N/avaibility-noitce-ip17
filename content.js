@@ -5,6 +5,7 @@ class iPhoneAvailabilityMonitor {
     this.lastAvailability = null;
     this.lastStoreData = null;
     this.storeNotificationSent = false;
+    this.hasReloadScheduled = false;
     this.checkInterval = null;
     this.currentModel = this.detectCurrentModel();
     this.init();
@@ -38,8 +39,7 @@ class iPhoneAvailabilityMonitor {
     this.autoSelectOptions();
     this.startPopupMonitor();
     
-    // Reload page after 3 seconds
-    this.schedulePageReload();
+    // Reloading is now handled after notifications to avoid detection
   }
 
   schedulePageReload() {
@@ -48,6 +48,25 @@ class iPhoneAvailabilityMonitor {
       console.log('Reloading page...');
       window.location.reload();
     }, 12000);
+  }
+
+  scheduleReloadAfterNotification() {
+    try {
+      if (this.hasReloadScheduled) return;
+      this.hasReloadScheduled = true;
+      const delay = Math.floor(1500 + Math.random() * 2000); // 1.5s - 3.5s
+      console.log(`Scheduling reload after notification in ${delay}ms...`);
+      setTimeout(() => {
+        try {
+          console.log('Reloading page after notification...');
+          window.location.reload();
+        } catch (error) {
+          console.error('Failed to reload page after notification:', error);
+        }
+      }, delay);
+    } catch (error) {
+      console.error('Error scheduling reload after notification:', error);
+    }
   }
 
   startPopupMonitor() {
@@ -333,6 +352,7 @@ class iPhoneAvailabilityMonitor {
         });
         this.lastStoreData = noButtonData;
         this.storeNotificationSent = true;
+        this.scheduleReloadAfterNotification();
       }
       return;
     }
@@ -998,12 +1018,13 @@ class iPhoneAvailabilityMonitor {
         // Always send notification for store availability results (even if no stores found)
         if (!this.storeNotificationSent) {
           console.log('Sending store availability notification with data:', availabilityData);
-        this.safeNotifyBackgroundScript({
-          type: 'STORE_AVAILABILITY_RESULTS',
-          data: availabilityData
-        });
+          this.safeNotifyBackgroundScript({
+            type: 'STORE_AVAILABILITY_RESULTS',
+            data: availabilityData
+          });
           this.lastStoreData = availabilityData;
           this.storeNotificationSent = true;
+          this.scheduleReloadAfterNotification();
         } else if (this.storeNotificationSent) {
           console.log('Store notification already sent, skipping to avoid spam');
         } else {
@@ -1032,6 +1053,7 @@ class iPhoneAvailabilityMonitor {
         });
         this.lastStoreData = basicAvailabilityData;
         this.storeNotificationSent = true;
+        this.scheduleReloadAfterNotification();
       }
       
       return false; // No store data found
