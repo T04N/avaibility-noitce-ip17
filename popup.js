@@ -214,16 +214,6 @@ class PopupController {
         return;
       }
 
-      // Clear cookies for the current domain
-      const url = new URL(currentTab.url);
-      const domain = url.hostname;
-      
-      // Clear cookies for the domain
-      await chrome.cookies.remove({
-        url: `https://${domain}`,
-        name: 'all'
-      });
-
       // Clear all cookies for Apple domains
       const appleDomains = [
         'apple.com',
@@ -238,9 +228,14 @@ class PopupController {
           
           // Remove each cookie
           for (const cookie of cookies) {
+            const scheme = cookie.secure ? 'https' : 'http';
+            const host = cookie.domain.startsWith('.') ? cookie.domain.substring(1) : cookie.domain;
+            const path = cookie.path || '/';
+            const removalUrl = `${scheme}://${host}${path}`;
             await chrome.cookies.remove({
-              url: `https://${cookie.domain}`,
-              name: cookie.name
+              url: removalUrl,
+              name: cookie.name,
+              storeId: cookie.storeId
             });
           }
         } catch (error) {
@@ -285,7 +280,6 @@ class PopupController {
       }, {
         cookies: true,
         localStorage: true,
-        sessionStorage: true,
         indexedDB: true,
         webSQL: true,
         cache: true,

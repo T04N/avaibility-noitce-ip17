@@ -15,21 +15,24 @@ Extension Chrome để monitor iPhone 17 Pro availability trên Apple Japan và 
 ## 🔧 **Setup**
 
 ### **1. Cài đặt Extension**
+
 1. Mở Chrome → Extensions → Developer mode
 2. Click "Load unpacked"
 3. Chọn folder chứa extension files
 
 ### **2. Cấu hình Proxy (Khuyến nghị)**
+
 ```bash
 # Windows
 setup-chrome-proxy.bat
 
-# Mac/Linux  
+# Mac/Linux
 chmod +x setup-chrome-proxy.sh
 ./setup-chrome-proxy.sh
 ```
 
 ### **3. Test Proxy**
+
 1. Mở [httpbin.org/ip](https://httpbin.org/ip)
 2. Check IP có khác với IP thật không
 3. Nếu khác = proxy hoạt động ✅
@@ -37,15 +40,18 @@ chmod +x setup-chrome-proxy.sh
 ## 📱 **Monitor Pages**
 
 ### **Product Pages**
+
 - `https://www.apple.com/jp/shop/buy-iphone/iphone-17-pro/*`
 - `https://www.apple.com/jp/shop/buy-iphone/iphone-17/*`
 
 ### **Bag Page**
+
 - `https://www.apple.com/jp/shop/bag`
 
 ## 🔄 **Proxy Configuration**
 
 ### **Thông tin Proxy**
+
 ```
 Host: choip.mproxy.vn
 Port: 12271
@@ -54,6 +60,7 @@ Password: B4a9yGhNsiNre0B
 ```
 
 ### **Auto Rotation**
+
 - ✅ **Rotate mỗi 5 phút**
 - ✅ **Clear browser data**
 - ✅ **User-Agent rotation**
@@ -63,6 +70,7 @@ Password: B4a9yGhNsiNre0B
 ## 📊 **Discord Notifications**
 
 ### **Store Availability**
+
 ```
 🛒 Bag Store Locator Popup Detected
 📮 Postal Code: 100-0005
@@ -73,6 +81,7 @@ Password: B4a9yGhNsiNre0B
 ```
 
 ### **Product Monitoring**
+
 ```
 📱 iPhone 17 Pro Store Availability Results
 📍 Region: 次の地域のApple Storeで受け取る
@@ -83,6 +92,7 @@ Password: B4a9yGhNsiNre0B
 ## 🤖 **Human Behavior Simulation**
 
 ### **Bag Page**
+
 - ✅ **Natural scrolling** với random patterns
 - ✅ **Mouse movement** simulation
 - ✅ **Hover before click** behavior
@@ -90,6 +100,7 @@ Password: B4a9yGhNsiNre0B
 - ✅ **Random interactions** với page elements
 
 ### **Anti-Detection**
+
 - ✅ **Random timing** 3-7 seconds
 - ✅ **Realistic mouse events**
 - ✅ **Natural scroll patterns**
@@ -111,12 +122,14 @@ availability-notice-ip17/
 ├── test-proxy.js         # Proxy test script
 ├── BROWSER_PROXY_SETUP.md # Browser proxy setup guide
 ├── PROXY_SETUP.md        # Proxy service guide
+├── package.json          # Puppeteer runner dependencies/scripts
 └── README.md             # This file
 ```
 
 ## 🔍 **Debug & Monitoring**
 
 ### **Console Logs**
+
 ```javascript
 === BAG PAGE DEBUG INFO ===
 Current URL: https://www.apple.com/jp/shop/bag
@@ -129,28 +142,32 @@ Last rotation: 1/15/2025, 2:30:45 PM
 ```
 
 ### **Test Scripts**
+
 ```javascript
 // Test proxy connection
 testProxyConnection();
 
 // Check extension status
-chrome.runtime.sendMessage({type: 'GET_SETTINGS'});
+chrome.runtime.sendMessage({ type: "GET_SETTINGS" });
 ```
 
 ## ⚠️ **Troubleshooting**
 
 ### **Proxy không hoạt động**
+
 1. Check credentials: `tev:B4a9yGhNsiNre0B`
 2. Test với curl: `curl -x http://tev:B4a9yGhNsiNre0B@choip.mproxy.vn:12271 http://httpbin.org/ip`
 3. Check firewall settings
 
 ### **Bị block nhanh**
+
 1. Tăng rotation interval lên 10 phút
 2. Sử dụng residential proxies
 3. Thêm random delays
 4. Clear browser data thường xuyên
 
 ### **Discord không nhận được**
+
 1. Check webhook URL trong background.js
 2. Test webhook với curl
 3. Check Discord server permissions
@@ -180,3 +197,43 @@ chrome.runtime.sendMessage({type: 'GET_SETTINGS'});
 ---
 
 **Lưu ý**: Extension này chỉ dành cho mục đích monitoring cá nhân. Vui lòng tuân thủ Terms of Service của Apple và các dịch vụ proxy.
+
+## 🤖 Puppeteer Runner (chạy ngoài trình duyệt)
+
+Chạy logic tương tự extension bằng Node + Puppeteer.
+
+### Cài đặt
+
+```bash
+npm install
+```
+
+Yêu cầu Node 18+.
+
+### Chạy
+
+- Mặc định (model Pro):
+
+```bash
+WEBHOOK_URL="https://discord.com/api/webhooks/..." npm run monitor
+```
+
+- Chọn model base:
+
+```bash
+MODEL=base WEBHOOK_URL="https://discord.com/api/webhooks/..." npm run monitor
+```
+
+- Dùng proxy (HTTP/SOCKS):
+
+```bash
+HTTPS_PROXY="http://user:pass@ip.mproxy.vn:12271" npm run monitor
+```
+
+Script sẽ:
+
+- Mở trang mua iPhone tại Apple JP
+- Tự chọn màu, dung lượng, phương thức thanh toán, tắt AppleCare
+- Mở dialog kiểm tra store availability
+- Phân tích kết quả và gửi Discord (nếu có `WEBHOOK_URL`)
+- Dọn dữ liệu site rồi thoát
