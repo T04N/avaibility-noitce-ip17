@@ -1739,12 +1739,84 @@ class BagStoreLocatorMonitor {
       return false;
     }
   }
+
+  clearStorage() {
+    try {
+      console.log('🍪 Clearing localStorage and sessionStorage...');
+      
+      // Clear localStorage
+      localStorage.clear();
+      console.log('✅ localStorage cleared');
+      
+      // Clear sessionStorage
+      sessionStorage.clear();
+      console.log('✅ sessionStorage cleared');
+      
+      // Clear cookies (if possible)
+      document.cookie.split(";").forEach(function(c) { 
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+      });
+      console.log('✅ Cookies cleared');
+      
+      console.log('🎉 All storage cleared successfully!');
+    } catch (error) {
+      console.error('❌ Error clearing storage:', error);
+    }
+  }
+
+  clearAllData() {
+    try {
+      console.log('🗑️ Clearing all data...');
+      
+      // Clear all storage
+      this.clearStorage();
+      
+      // Clear any extension-specific data
+      if (window.ipRotationManager) {
+        window.ipRotationManager.failedNotificationCount = 0;
+        window.ipRotationManager.rotationCount = 0;
+        console.log('✅ Extension data reset');
+      }
+      
+      console.log('🎉 All data cleared successfully!');
+    } catch (error) {
+      console.error('❌ Error clearing all data:', error);
+    }
+  }
 }
+
+// Message listener for popup commands
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  try {
+    switch (message.type) {
+      case 'CLEAR_STORAGE':
+        if (window.bagMonitor) {
+          window.bagMonitor.clearStorage();
+        }
+        sendResponse({ success: true });
+        break;
+        
+      case 'CLEAR_ALL_DATA':
+        if (window.bagMonitor) {
+          window.bagMonitor.clearAllData();
+        }
+        sendResponse({ success: true });
+        break;
+        
+      default:
+        sendResponse({ success: false, error: 'Unknown message type' });
+    }
+  } catch (error) {
+    console.error('Error handling message:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+  return true; // Keep message channel open for async response
+});
 
 // Initialize the monitor when the page loads
 function initializeBagMonitor() {
   try {
-    new BagStoreLocatorMonitor();
+    window.bagMonitor = new BagStoreLocatorMonitor();
   } catch (error) {
     console.error('Error initializing bag monitor:', error);
   }

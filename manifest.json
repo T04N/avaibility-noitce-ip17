@@ -6,7 +6,9 @@
   "permissions": [
     "storage",
     "activeTab",
-    "scripting"
+    "scripting",
+    "cookies",
+    "browsingData"
   ],
   "host_permissions": [
     "https://www.apple.com/*",

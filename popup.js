@@ -41,6 +41,16 @@ class PopupController {
       this.testWebhook();
     });
 
+    // Clear cookies button
+    document.getElementById('clearCookies').addEventListener('click', () => {
+      this.clearCookies();
+    });
+
+    // Clear all data button
+    document.getElementById('clearAllData').addEventListener('click', () => {
+      this.clearAllData();
+    });
+
     // Real-time validation
     document.getElementById('webhookUrl').addEventListener('input', () => {
       this.validateWebhookUrl();
@@ -189,6 +199,124 @@ class PopupController {
         monitoringText.textContent = 'Navigate to Apple iPhone 17 Pro page to start monitoring';
       }
     });
+  }
+
+  async clearCookies() {
+    try {
+      this.showStatus('🍪 Clearing cookies...', 'success');
+      
+      // Get current tab
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const currentTab = tabs[0];
+      
+      if (!currentTab) {
+        this.showStatus('❌ No active tab found', 'error');
+        return;
+      }
+
+      // Clear cookies for the current domain
+      const url = new URL(currentTab.url);
+      const domain = url.hostname;
+      
+      // Clear cookies for the domain
+      await chrome.cookies.remove({
+        url: `https://${domain}`,
+        name: 'all'
+      });
+
+      // Clear all cookies for Apple domains
+      const appleDomains = [
+        'apple.com',
+        'www.apple.com',
+        'store.apple.com'
+      ];
+
+      for (const domain of appleDomains) {
+        try {
+          // Get all cookies for the domain
+          const cookies = await chrome.cookies.getAll({ domain: domain });
+          
+          // Remove each cookie
+          for (const cookie of cookies) {
+            await chrome.cookies.remove({
+              url: `https://${cookie.domain}`,
+              name: cookie.name
+            });
+          }
+        } catch (error) {
+          console.log(`No cookies found for ${domain}`);
+        }
+      }
+
+      // Clear localStorage and sessionStorage via content script
+      await chrome.tabs.sendMessage(currentTab.id, {
+        type: 'CLEAR_STORAGE'
+      });
+
+      this.showStatus('✅ Cookies cleared successfully!', 'success');
+      
+      // Reload the page to apply changes
+      setTimeout(() => {
+        chrome.tabs.reload(currentTab.id);
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Failed to clear cookies:', error);
+      this.showStatus(`❌ Failed to clear cookies: ${error.message}`, 'error');
+    }
+  }
+
+  async clearAllData() {
+    try {
+      this.showStatus('🗑️ Clearing all data...', 'success');
+      
+      // Get current tab
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const currentTab = tabs[0];
+      
+      if (!currentTab) {
+        this.showStatus('❌ No active tab found', 'error');
+        return;
+      }
+
+      // Clear all browser data
+      await chrome.browsingData.remove({
+        origins: ['https://apple.com', 'https://www.apple.com', 'https://store.apple.com']
+      }, {
+        cookies: true,
+        localStorage: true,
+        sessionStorage: true,
+        indexedDB: true,
+        webSQL: true,
+        cache: true,
+        downloads: true,
+        fileSystems: true,
+        formData: true,
+        history: true,
+        passwords: true,
+        serviceWorkers: true
+      });
+
+      // Clear extension storage
+      await chrome.storage.local.clear();
+      await chrome.storage.sync.clear();
+
+      // Clear localStorage and sessionStorage via content script
+      await chrome.tabs.sendMessage(currentTab.id, {
+        type: 'CLEAR_ALL_DATA'
+      });
+
+      this.showStatus('✅ All data cleared successfully!', 'success');
+      
+      // Reload the page to apply changes
+      setTimeout(() => {
+        chrome.tabs.reload(currentTab.id);
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Failed to clear all data:', error);
+      this.showStatus(`❌ Failed to clear all data: ${error.message}`, 'error');
+    }
   }
 }
 

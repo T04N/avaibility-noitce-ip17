@@ -236,6 +236,48 @@ class iPhoneAvailabilityMonitor {
     }
   }
 
+  clearStorage() {
+    try {
+      console.log('🍪 Clearing localStorage and sessionStorage...');
+      
+      // Clear localStorage
+      localStorage.clear();
+      console.log('✅ localStorage cleared');
+      
+      // Clear sessionStorage
+      sessionStorage.clear();
+      console.log('✅ sessionStorage cleared');
+      
+      // Clear cookies (if possible)
+      document.cookie.split(";").forEach(function(c) { 
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+      });
+      console.log('✅ Cookies cleared');
+      
+      console.log('🎉 All storage cleared successfully!');
+    } catch (error) {
+      console.error('❌ Error clearing storage:', error);
+    }
+  }
+
+  clearAllData() {
+    try {
+      console.log('🗑️ Clearing all data...');
+      
+      // Clear all storage
+      this.clearStorage();
+      
+      // Clear any extension-specific data
+      this.hasReloadScheduled = false;
+      this.storeNotificationSent = false;
+      console.log('✅ Extension data reset');
+      
+      console.log('🎉 All data cleared successfully!');
+    } catch (error) {
+      console.error('❌ Error clearing all data:', error);
+    }
+  }
+
   startPopupMonitor() {
     console.log('Starting popup monitor...');
     
@@ -1473,7 +1515,7 @@ class iPhoneAvailabilityMonitor {
 // Initialize the monitor when the page loads
 function initializeMonitor() {
   try {
-    new iPhoneAvailabilityMonitor();
+    window.iphoneMonitor = new iPhoneAvailabilityMonitor();
   } catch (error) {
     console.error('Error initializing monitor:', error);
     
@@ -1553,6 +1595,34 @@ function sendDirectNotification(data) {
     console.error('Error in sendDirectNotification:', error);
   }
 }
+
+// Message listener for popup commands
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  try {
+    switch (message.type) {
+      case 'CLEAR_STORAGE':
+        if (window.iphoneMonitor) {
+          window.iphoneMonitor.clearStorage();
+        }
+        sendResponse({ success: true });
+        break;
+        
+      case 'CLEAR_ALL_DATA':
+        if (window.iphoneMonitor) {
+          window.iphoneMonitor.clearAllData();
+        }
+        sendResponse({ success: true });
+        break;
+        
+      default:
+        sendResponse({ success: false, error: 'Unknown message type' });
+    }
+  } catch (error) {
+    console.error('Error handling message:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+  return true; // Keep message channel open for async response
+});
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initializeMonitor);
